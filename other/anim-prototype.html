@@ -1,0 +1,247 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>ApexOS - Boot Animation</title>
+
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;700;800&display=swap"
+      rel="stylesheet"
+    />
+
+    <style>
+      /* Palette de Boot Réaliste */
+      :root {
+        --bg-color: #000000; /* Noir pur */
+        --nord4: #d8dee9; /* Texte blanc/gris clair */
+        --nord10: #5e81ac; /* Bleu acier profond (Nord10) pour le "OS" et le Spinner */
+        --spinner-track: rgba(216, 222, 233, 0.1); /* Fond du spinner */
+      }
+
+      * {
+        box-sizing: border-box;
+        margin: 0;
+        padding: 0;
+      }
+
+      body {
+        background-color: var(--bg-color);
+        height: 100vh;
+        display: flex;
+        flex-direction: column; /* Aligne le contenu et le spinner verticalement */
+        justify-content: center;
+        align-items: center;
+        overflow: hidden;
+        font-family: "Inter", sans-serif;
+      }
+
+      /* Conteneur principal */
+      .boot-container {
+        display: flex;
+        align-items: center;
+        position: relative;
+        cursor: pointer;
+        height: 160px;
+      }
+
+      /* ── LE LOGO APEX ── */
+      .logo-wrapper {
+        width: 150px;
+        height: 150px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        z-index: 2;
+
+        /* Étape 1 : Apparition (Fade in + scale up) */
+        opacity: 0;
+        transform: scale(0.3);
+        animation: fadeInLogo 0.6s ease-out forwards;
+      }
+
+      .logo-img {
+        width: 100%;
+        height: 100%;
+        object-fit: contain;
+        /* Transition fluide pour l'effet de roulement en JS */
+        transition: transform 1.2s cubic-bezier(0.25, 1, 0.5, 1);
+      }
+
+      /* ── LE TEXTE APEXOS ── */
+      .text-reveal-container {
+        overflow: hidden;
+        width: 0; /* Caché au départ */
+        display: flex;
+        align-items: center;
+        z-index: 1;
+
+        /* Marge négative magique à -30px */
+        margin-left: -30px;
+
+        /* Transition de dévoilement */
+        transition: width 1.2s cubic-bezier(0.25, 1, 0.5, 1);
+      }
+
+      .brand-text {
+        font-size: 4.8rem;
+        font-weight: 800;
+        letter-spacing: -2px;
+        color: var(--nord4);
+        white-space: nowrap;
+        padding-left: 10px;
+        opacity: 0;
+        transform: translateX(-30px);
+        transition:
+          opacity 0.8s ease,
+          transform 1.2s cubic-bezier(0.25, 1, 0.5, 1);
+      }
+
+      /* Accent Nord10 appliqué ici sur le "OS" */
+      .brand-text span {
+        color: var(--nord10);
+      }
+
+      /* ── LE SPINNER MINIMALISTE ── */
+      .spinner-container {
+        margin-top: -10px; /* Remonté au maximum sous le texte */
+        height: 30px;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+      }
+
+      .spinner {
+        width: 24px;
+        height: 24px;
+        border: 3px solid var(--spinner-track);
+        border-top: 3px solid var(--nord10); /* Partie active en Nord10 */
+        border-radius: 50%;
+
+        /* Cache par défaut pour l'animation d'apparition */
+        opacity: 0;
+        transform: scale(0.6);
+
+        /* Transitions pour le fondu */
+        transition:
+          opacity 0.8s ease,
+          transform 0.8s ease-out;
+      }
+
+      /* Classe active ajoutée en JS pour lancer la rotation et l'apparition */
+      .spinner.active {
+        opacity: 1;
+        transform: scale(1);
+        animation: spin 1s linear infinite;
+      }
+
+      /* ── ANIMATIONS ── */
+      @keyframes fadeInLogo {
+        to {
+          opacity: 1;
+          transform: scale(1);
+        }
+      }
+
+      @keyframes spin {
+        0% {
+          transform: rotate(0deg);
+        }
+        100% {
+          transform: rotate(360deg);
+        }
+      }
+
+      /* Indication en bas pour relancer */
+      .replay-hint {
+        position: absolute;
+        bottom: 30px;
+        color: #2e3440;
+        font-size: 0.9rem;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+        animation: pulse 2s infinite;
+        user-select: none;
+        pointer-events: none;
+      }
+
+      @keyframes pulse {
+        0%,
+        100% {
+          opacity: 0.4;
+        }
+        50% {
+          opacity: 0.8;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <div class="boot-container" id="bootContainer">
+      <div class="logo-wrapper">
+        <img
+          src="apex_logo_no_bg.svg"
+          alt="Apex Logo"
+          class="logo-img"
+          id="logo"
+        />
+      </div>
+
+      <div class="text-reveal-container" id="textContainer">
+        <h1 class="brand-text" id="brandText">Apex<span>OS</span></h1>
+      </div>
+    </div>
+
+    <div class="spinner-container">
+      <div class="spinner" id="bootSpinner"></div>
+    </div>
+
+    <div class="replay-hint">Clique sur le logo pour rejouer</div>
+
+    <script>
+      const logo = document.getElementById("logo");
+      const textContainer = document.getElementById("textContainer");
+      const brandText = document.getElementById("brandText");
+      const bootContainer = document.getElementById("bootContainer");
+      const bootSpinner = document.getElementById("bootSpinner");
+
+      function startBootAnimation() {
+        // Réinitialisation complète
+        logo.style.transform = "translateX(0) rotate(0deg)";
+        textContainer.style.width = "0px";
+        brandText.style.opacity = "0";
+        brandText.style.transform = "translateX(-30px)";
+
+        // On cache le spinner au début d’un nouveau boot
+        bootSpinner.classList.remove("active");
+
+        // MODIFICATION : Déclenchement à 600ms (pile quand le logo a fini d'apparaître)
+        setTimeout(() => {
+          logo.style.transform = "translateX(-15px) rotate(-360deg)";
+          textContainer.style.width = "320px";
+          brandText.style.opacity = "1";
+          brandText.style.transform = "translateX(0)";
+        }, 600);
+
+        // MODIFICATION : Le spinner arrive 1s après le début du mouvement (à 1.6s au lieu de 2.2s)
+        setTimeout(() => {
+          bootSpinner.classList.add("active");
+        }, 1600);
+      }
+
+      // Lancement au chargement de la page
+      window.addEventListener("DOMContentLoaded", startBootAnimation);
+
+      // Permet de rejouer
+      bootContainer.addEventListener("click", () => {
+        const wrapper = document.querySelector(".logo-wrapper");
+        wrapper.style.animation = "none";
+        wrapper.offsetHeight; /* Force reflow */
+        wrapper.style.animation = null;
+        startBootAnimation();
+      });
+    </script>
+  </body>
+</html>
