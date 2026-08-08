@@ -53,6 +53,8 @@ C_SRCS    := core/kernel.c            \
              core/axf/axd.c           \
              drivers/vga.c            \
              drivers/framebuffer.c    \
+             drivers/framebuffer_draw.c \
+             drivers/font8x8.c        \
              drivers/pic.c            \
              drivers/pit.c            \
              drivers/serial.c         \

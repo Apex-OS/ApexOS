@@ -12,6 +12,7 @@
 #include "../../fs/axfs.h"
 #include "../../fs/vfs.h"
 #include "../../drivers/framebuffer.h"
+#include "../../drivers/framebuffer_draw.h"
 
 void cmd_help(void)
 {
@@ -410,5 +411,18 @@ void cmd_gfxtest(void)
     klog_ok_n("gfxtest: resolution width", info.width);
     klog_ok_n("gfxtest: resolution height", info.height);
 
-    fb_clear(FB_RGB(30, 60, 114)); // solid dark blue -- just proves the pipeline works end to end
+    fb_clear(FB_RGB(30, 60, 114)); // solid dark blue background
+
+    // A few shapes to exercise the new drawing primitives end to end:
+    // a filled rectangle, an outlined rectangle, and a diagonal line
+    // across the screen -- not meant to look like anything in
+    // particular yet, just proof that fb_fill_rect/fb_draw_rect/
+    // fb_draw_line all work against the real framebuffer.
+    fb_fill_rect(50, 50, 200, 120, FB_RGB(220, 80, 60));
+    fb_draw_rect(300, 50, 200, 120, 6, FB_RGB(240, 200, 60));
+    fb_draw_line(50, 220, info.width - 50, 220, FB_RGB(255, 255, 255));
+    fb_draw_line(50, 220, 300, info.height - 50, FB_RGB(120, 220, 140));
+
+    fb_draw_text(50, 250, "ApexOS Graphics Mode", 2, FB_RGB(255, 255, 255));
+    fb_draw_text(50, 280, "Hello, framebuffer!", 1, FB_RGB(200, 200, 255));
 }
