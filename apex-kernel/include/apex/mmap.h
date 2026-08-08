@@ -7,8 +7,14 @@
 #include "types.h"
 
 // Fixed addresses (populated by stage2 at boot).
-#define MMAP_ADDR 0x500
-#define MMAP_COUNT_ADDR 0x4FC
+// BUG FIX: moved from 0x500/0x4FC -- that low-memory zone was getting
+// overwritten (by the BIOS itself, during VBE int 0x10 calls, most
+// likely) once VESA/VBE mode detection was added to stage2.asm,
+// corrupting the E820 map before this code ever read it. See
+// stage2.asm (MMAP_ADDR/MMAP_COUNT) for the full explanation -- these
+// two must always match exactly.
+#define MMAP_ADDR 0x9600
+#define MMAP_COUNT_ADDR 0x95FC
 
 // E820 entry types.
 #define MMAP_AVAILABLE 1    // Usable RAM

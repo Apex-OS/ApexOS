@@ -9,7 +9,20 @@
 KERNEL_TMP_SEG      equ 0x1000
 KERNEL_TMP_OFF      equ 0x0000
 KERNEL_FINAL_ADDR   equ 0x100000
-KERNEL_SECTORS      equ 128
+KERNEL_SECTORS      equ 160        ; BUG FIX: was 128 (64KB) -- kernel.bin
+                                    ; grew past that (66368 bytes, needs 130
+                                    ; sectors minimum) once the framebuffer
+                                    ; driver and VBE-related code were added.
+                                    ; The tail of the kernel binary -- which
+                                    ; happens to hold the .data section,
+                                    ; including vmm.c's `pml4` static
+                                    ; variable -- was silently left
+                                    ; uncopied/unloaded, leaving pml4 at 0
+                                    ; instead of KERNEL_PML4 (0x1000). This
+                                    ; caused a GPF in vmm_get_or_create()
+                                    ; dereferencing a NULL page table during
+                                    ; vmm_init(). 160 sectors (80KB) leaves
+                                    ; headroom for further growth.
 KERNEL_LBA          equ 34 ; BUG FIX: was 18, but the Makefile now
                             ; writes the kernel starting at sector 34
                             ; (stage2 grew from 16 to 32 sectors when
@@ -26,8 +39,23 @@ KERNEL_LBA          equ 34 ; BUG FIX: was 18, but the Makefile now
                             ; hang was unrelated to VBE, and present
                             ; even with VBE detection fully disabled.
 
-MMAP_ADDR           equ 0x500
-MMAP_COUNT          equ 0x4FC
+MMAP_ADDR           equ 0x9600 ; BUG FIX: was 0x500 -- something (the BIOS
+                                ; itself, during int 0x10 VBE calls, most
+                                ; likely) was overwriting this low-memory
+                                ; zone with garbage during VBE mode
+                                ; detection, corrupting the E820 map before
+                                ; the kernel ever read it (pmm_init() then
+                                ; read a bogus entry count in the hundreds
+                                ; of millions and crashed). Moved well away
+                                ; from every other low-memory structure this
+                                ; bootloader uses, and clear of the VBE
+                                ; buffers too (VBE_INFO_ADDR 0x9000-0x9200,
+                                ; VBE_MODE_INFO_ADDR 0x9200-0x9300,
+                                ; VBE_RESULT_ADDR 0x9300-0x930C).
+MMAP_COUNT          equ 0x95FC ; kept in the 512 bytes just before MMAP_ADDR,
+                                ; same relative layout as before (grep
+                                ; MMAP_COUNT_ADDR in include/apex/mmap.h --
+                                ; must match this exactly)
 
 ; VBE buffers -- placed well clear of MMAP_ADDR/PML4_ADDR/the temporary
 ; kernel load address (0x10000), see the comment above vbe_info_block.
@@ -69,9 +97,37 @@ enable_a20:
     ret
 
 ; ── Charge kernel à 0x10000 ──────────────────────────────────────────────────
+; Loads the kernel in multiple chunks, each well under the 64KB
+; per-read limit some BIOSes enforce on the destination segment (the
+; single-DAP-call approach used here before broke once KERNEL_SECTORS
+; grew to 160 (80KB): "offset + 512*count - 1" exceeded 0xFFFF, and
+; SeaBIOS (QEMU's default BIOS) refused the read outright with "Disk
+; read error!"). CHUNK_SECTORS=64 (32KB) stays safely under that limit
+; for every chunk, with the destination segment advanced by 32KB
+; (0x800 paragraphs) between reads -- KERNEL_TMP_SEG itself never
+; moves, only dap_buffer_seg (a copy used per-chunk) does, so
+; KERNEL_TMP_SEG stays the fixed base pm32_entry's copy loop expects.
+CHUNK_SECTORS equ 64
+
 load_kernel_low:
     mov si, msg_loading
     call print16
+
+    mov word [dap_buffer_seg], KERNEL_TMP_SEG
+    mov dword [dap_lba_lo], KERNEL_LBA
+    mov word [remaining_sectors], KERNEL_SECTORS
+
+.chunk_loop:
+    cmp word [remaining_sectors], 0
+    je .done
+
+    ; This chunk's size: min(CHUNK_SECTORS, remaining).
+    mov ax, [remaining_sectors]
+    cmp ax, CHUNK_SECTORS
+    jbe .size_ok
+    mov ax, CHUNK_SECTORS
+.size_ok:
+    mov [dap_count], ax
 
     mov ah, 0x42
     mov dl, [boot_drive]
@@ -79,6 +135,18 @@ load_kernel_low:
     int 0x13
     jc .error
 
+    ; Advances by this chunk's size: LBA += count, segment += count*32
+    ; (count*512 bytes / 16 bytes-per-paragraph = count*32).
+    movzx eax, word [dap_count]
+    add dword [dap_lba_lo], eax
+    sub [remaining_sectors], ax
+
+    shl ax, 5 ; count * 32
+    add [dap_buffer_seg], ax
+
+    jmp .chunk_loop
+
+.done:
     mov si, msg_loaded
     call print16
     ret
@@ -174,10 +242,6 @@ detect_vbe_mode:
     cmp ax, 0x004F
     jne .no_vbe ; BIOS doesn't support VBE at all -- stays in VGA text mode
 
-    ; DEBUG CHECKPOINT
-    mov si, msg_4f00_ok
-    call print16
-
     ; VideoModePtr (offset 0x0E, far pointer segment:offset) -> the
     ; list of supported mode numbers, terminated by 0xFFFF.
     mov si, [VBE_INFO_ADDR + 0x10] ; offset
@@ -188,12 +252,6 @@ detect_vbe_mode:
                              ; iteration below, rather than trusted to
                              ; still hold this value after any BIOS call.
     mov fs, ax
-
-    ; DEBUG CHECKPOINT
-    push si
-    mov si, msg_ptr_read
-    call print16
-    pop si
 
     ; Best candidate found so far (0xFFFF = none yet).
     mov word [best_mode], 0xFFFF
@@ -206,35 +264,10 @@ detect_vbe_mode:
     mov ax, [mode_list_seg]
     mov fs, ax
 
-    ; DEBUG CHECKPOINT -- one dot per mode examined, so we can see how
-    ; far the loop gets (or that it never even starts).
-    push ax
-    push si
-    mov ah, 0x0E
-    mov al, '.'
-    int 0x10
-    pop si
-    pop ax
-
     mov cx, fs:[si]
     cmp cx, 0xFFFF
     je .scan_done
     add si, 2
-
-    ; DEBUG: sends the raw mode number just read to COM1 (serial) --
-    ; easier to capture/copy from the terminal than counting on-screen
-    ; text. Confirms whether the corruption is present from the very
-    ; first read (fs:[si] itself) or introduced later in the loop.
-    push ax
-    push cx
-    push dx
-    mov ax, cx
-    call serial_hex16
-    mov al, ' '
-    call serial_char
-    pop dx
-    pop cx
-    pop ax
 
     ; Saves the mode number in a fixed memory location right away,
     ; BEFORE the int 0x10 call below -- fs is not guaranteed to
@@ -319,38 +352,6 @@ detect_vbe_mode:
     cmp ax, 0x004F
     jne .no_vbe
 
-    ; DEBUG CHECKPOINT -- confirms mode scanning succeeded and picked a
-    ; mode, right before switching the display (the point past which
-    ; text-mode print16 stops being usable). Remove once the crash is
-    ; fixed.
-    mov si, msg_vbe_scan_ok
-    call print16
-
-    ; DEBUG: prints the chosen mode's width/height/mode number in hex,
-    ; so we know exactly what's about to be set.
-    mov si, msg_width
-    call print16
-    mov ax, [VBE_MODE_INFO_ADDR + 0x12]
-    call print_hex16
-    mov si, msg_height
-    call print16
-    mov ax, [VBE_MODE_INFO_ADDR + 0x14]
-    call print_hex16
-    mov si, msg_modenum
-    call print16
-    mov ax, [best_mode]
-    call print_hex16
-    mov si, msg_newline
-    call print16
-
-    ; DEBUG: deliberate ~2s pause (int 15h AH=86h waits CX:DX
-    ; microseconds -- 2,000,000us = 0x1E8480) so the message above is
-    ; actually readable before the display mode changes.
-    mov cx, 0x001E
-    mov dx, 0x8480
-    mov ah, 0x86
-    int 0x15
-
     ; ── Function 4F02h: Set VBE Mode ───────────────────────────────────────
     ; Bit 14 (0x4000) requests a linear framebuffer -- already confirmed
     ; supported by this mode's attributes bit 7 during the scan.
@@ -402,101 +403,30 @@ print16:
 .done:
     ret
 
-; ── Minimal 16-bit real-mode serial output (COM1, port 0x3F8) ─────────────
-; Bypasses the BIOS console entirely -- writes straight to the UART's
-; transmit register, so debug output can be captured in the terminal
-; (via QEMU's -serial stdio) instead of scrolling past on-screen.
-; UART is used raw here (no init sequence) -- QEMU's default UART
-; state accepts writes without needing the full 8N1/baud rate setup
-; the real serial_init() (drivers/serial.c) does later in C; real
-; hardware might need that setup first, but this is debug-only code
-; removed once the VBE issue is fixed.
-serial_char:
-    push dx
-    push ax
-    mov dx, 0x3FD ; line status register
-.wait:
-    in al, dx
-    test al, 0x20 ; transmit-empty bit
-    jz .wait
-    pop ax
-    push ax
-    mov dx, 0x3F8
-    out dx, al
-    pop ax
-    pop dx
-    ret
-
-serial_hex16:
-    push ax
-    push bx
-    push cx
-    push dx
-    mov cx, 4
-    mov bx, ax
-.loop:
-    rol bx, 4
-    mov ax, bx
-    and ax, 0x000F
-    cmp al, 10
-    jb .digit
-    add al, 'A' - 10 - '0'
-.digit:
-    add al, '0'
-    call serial_char
-    loop .loop
-    pop dx
-    pop cx
-    pop bx
-    pop ax
-    ret
-
-; ── Print a 16-bit value in hex (debug only) ──────────────────────────────
-print_hex16:
-    push ax
-    push bx
-    push cx
-    push dx
-    mov cx, 4
-    mov bx, ax
-.hex_loop:
-    rol bx, 4
-    mov ax, bx
-    and ax, 0x000F
-    cmp al, 10
-    jb .digit
-    add al, 'A' - 10 - '0'
-.digit:
-    add al, '0'
-    mov ah, 0x0E
-    int 0x10
-    loop .hex_loop
-    pop dx
-    pop cx
-    pop bx
-    pop ax
-    ret
-
 ; ── DAP ──────────────────────────────────────────────────────────────────────
+; DAP fields are named individually so load_kernel_low's chunk loop
+; can update count/segment/LBA between reads (see dap_count,
+; dap_buffer_seg, dap_lba_lo/dap_lba_hi below -- same memory, just
+; labeled per-field instead of one opaque block).
 dap:
     db 0x10
     db 0
-    dw KERNEL_SECTORS
+dap_count:
+    dw KERNEL_SECTORS ; overwritten per-chunk by load_kernel_low
+dap_buffer_off:
     dw KERNEL_TMP_OFF
-    dw KERNEL_TMP_SEG
-    dq KERNEL_LBA
+dap_buffer_seg:
+    dw KERNEL_TMP_SEG ; overwritten per-chunk by load_kernel_low
+dap_lba_lo:
+    dd KERNEL_LBA      ; overwritten per-chunk by load_kernel_low
+dap_lba_hi:
+    dd 0
+
+remaining_sectors: dw 0
 
 boot_drive  db 0
 
 msg_stage2      db "ApexOS Stage2 OK", 0x0D, 0x0A, 0
-msg_4f00_ok     db "4F00h OK (got VBE info)", 0x0D, 0x0A, 0
-msg_ptr_read    db "Mode list pointer read", 0x0D, 0x0A, 0
-msg_width       db "Width=0x", 0
-msg_height      db " Height=0x", 0
-msg_modenum     db " Mode=0x", 0
-msg_newline     db 0x0D, 0x0A, 0
-msg_vbe_scan_ok db "VBE mode found, switching display...", 0x0D, 0x0A, 0
-msg_vbe_done    db "VBE detection done, entering protected mode...", 0x0D, 0x0A, 0
 msg_loading     db "Loading kernel...", 0x0D, 0x0A, 0
 msg_loaded      db "Kernel loaded OK!", 0x0D, 0x0A, 0
 msg_disk_err    db "Disk read error!", 0x0D, 0x0A, 0

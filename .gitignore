@@ -13,4 +13,6 @@ build/
 # AXFS_DEFAULT_TREE in apex-kernel/fs/axfs_tree.c for the actual
 # source of truth, built in RAM at boot) -- kept locally as a visual
 # design aid, not part of the build.
-apex-kernel/fs/axfs_hierarchy/tools/tests/last_run.log
+apex-kernel/fs/axfs_hierarchy/
+tools/tests/last_run.log
+apex-project.zip
