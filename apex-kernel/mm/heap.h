@@ -7,7 +7,16 @@
 #include "../include/apex/types.h"
 
 #define HEAP_START 0x800000    // 8MB
-#define HEAP_MAX_SIZE 0x400000 // 4MB
+#define HEAP_MAX_SIZE 0x800000 // 8MB -- grown from 4MB to fit the graphics
+                               // back-buffer (drivers/framebuffer.c), sized
+                               // off the VBE mode picked at boot (capped at
+                               // 1600x900x4 bytes = ~5.76MB, see stage2.asm:
+                               // MAX_FB_WIDTH/MAX_FB_HEIGHT). Heap now spans
+                               // [0x800000, 0x1000000) -- 8MB to 16MB. If you
+                               // change this again, AXD_BASE_ADDR
+                               // (core/axf/axd.c) MUST be re-checked for
+                               // overlap -- it was moved past this range for
+                               // exactly that reason.
 
 typedef struct heap_block
 {

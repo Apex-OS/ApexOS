@@ -13,6 +13,8 @@
 #include "../../fs/vfs.h"
 #include "../../drivers/framebuffer.h"
 #include "../../drivers/framebuffer_draw.h"
+#include "../../drivers/mouse.h"
+#include "../../drivers/keyboard.h"
 
 void cmd_help(void)
 {
@@ -399,6 +401,25 @@ void cmd_run(const char *name)
 // switch back to VGA text mode yet, since the shell that would print
 // any follow-up message isn't rendered in graphics mode either. Reset
 // the machine (or `make run` again) to get back to a normal boot.
+// Draws the static scene (background + shapes + text) once. The
+// cursor is handled separately via fb_save_cursor_bg()/
+// fb_restore_cursor_bg() (dirty-rectangle update) in cmd_gfxtest, so
+// this never needs to run again after the first frame -- only the
+// small block of pixels under the cursor changes per frame.
+static void gfxtest_draw_scene(fb_info_t info)
+{
+    fb_clear(FB_RGB(30, 60, 114)); // solid dark blue background
+
+    fb_fill_rect(50, 50, 200, 120, FB_RGB(220, 80, 60));
+    fb_draw_rect(300, 50, 200, 120, 6, FB_RGB(240, 200, 60));
+    fb_draw_line(50, 220, info.width - 50, 220, FB_RGB(255, 255, 255));
+    fb_draw_line(50, 220, 300, info.height - 50, FB_RGB(120, 220, 140));
+
+    fb_draw_text(50, 250, "ApexOS Graphics Mode", 2, FB_RGB(255, 255, 255));
+    fb_draw_text(50, 280, "Hello, framebuffer!", 1, FB_RGB(200, 200, 255));
+    fb_draw_text(50, 300, "Move the mouse -- any key to exit", 1, FB_RGB(160, 160, 200));
+}
+
 void cmd_gfxtest(void)
 {
     if (!fb_init())
@@ -411,18 +432,37 @@ void cmd_gfxtest(void)
     klog_ok_n("gfxtest: resolution width", info.width);
     klog_ok_n("gfxtest: resolution height", info.height);
 
-    fb_clear(FB_RGB(30, 60, 114)); // solid dark blue background
+    // Clamps the tracked mouse position to the real screen bounds now
+    // that we know them -- before this, mouse.c tracks position
+    // unclamped (harmless, nothing was reading it to draw a cursor).
+    mouse_set_bounds((int32_t)info.width - 1, (int32_t)info.height - 1);
 
-    // A few shapes to exercise the new drawing primitives end to end:
-    // a filled rectangle, an outlined rectangle, and a diagonal line
-    // across the screen -- not meant to look like anything in
-    // particular yet, just proof that fb_fill_rect/fb_draw_rect/
-    // fb_draw_line all work against the real framebuffer.
-    fb_fill_rect(50, 50, 200, 120, FB_RGB(220, 80, 60));
-    fb_draw_rect(300, 50, 200, 120, 6, FB_RGB(240, 200, 60));
-    fb_draw_line(50, 220, info.width - 50, 220, FB_RGB(255, 255, 255));
-    fb_draw_line(50, 220, 300, info.height - 50, FB_RGB(120, 220, 140));
+    gfxtest_draw_scene(info);
 
-    fb_draw_text(50, 250, "ApexOS Graphics Mode", 2, FB_RGB(255, 255, 255));
-    fb_draw_text(50, 280, "Hello, framebuffer!", 1, FB_RGB(200, 200, 255));
+    mouse_state_t last_state = mouse_get_state();
+    fb_save_cursor_bg((uint32_t)last_state.x, (uint32_t)last_state.y);
+    fb_draw_cursor((uint32_t)last_state.x, (uint32_t)last_state.y, FB_RGB(255, 255, 255));
+    fb_present(); // pushes the first frame to VRAM -- see the double-buffering note in framebuffer.h
+
+    // Exits on any keypress -- no mode-switch back to VGA text yet
+    // (see the file-level comment on cmd_gfxtest's one-way nature),
+    // this just stops redrawing so the last frame stays visible.
+    while (!keyboard_has_key())
+    {
+        mouse_state_t state = mouse_get_state();
+        if (state.x != last_state.x || state.y != last_state.y)
+        {
+            // Dirty-rectangle cursor update: erase the old cursor by
+            // restoring what was under it, THEN save what's under the
+            // new position before drawing there -- the static scene
+            // itself is never touched again after the initial draw
+            // above, so this is the only work done per frame.
+            fb_restore_cursor_bg((uint32_t)last_state.x, (uint32_t)last_state.y);
+            fb_save_cursor_bg((uint32_t)state.x, (uint32_t)state.y);
+            fb_draw_cursor((uint32_t)state.x, (uint32_t)state.y, FB_RGB(255, 255, 255));
+            fb_present(); // one sequential VRAM copy per frame -- no more flicker
+            last_state = state;
+        }
+    }
+    keyboard_getchar(); // consumes the keypress that ended the loop
 }

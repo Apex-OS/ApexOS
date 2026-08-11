@@ -11,6 +11,14 @@
 // coexist. A machine with no suitable VBE mode simply never gets a
 // working framebuffer (fb_init() returns false), and the kernel
 // keeps using VGA text mode as it always has.
+//
+// Double buffering: fb_clear/fb_put_pixel (and everything built on
+// top of them in framebuffer_draw.c) write to an off-screen buffer
+// in normal RAM, not the real VRAM -- drawing a full frame there
+// causes no visible flicker since the monitor never sees a
+// partially-drawn frame. fb_present() is the only function that
+// touches real VRAM: one sequential copy of the whole back-buffer,
+// called once per frame after all drawing for that frame is done.
 
 #ifndef APEX_FRAMEBUFFER_H
 #define APEX_FRAMEBUFFER_H
@@ -62,5 +70,19 @@ void fb_clear(uint32_t color);
 // [0, width) x [0, height); out-of-range writes corrupt adjacent
 // framebuffer memory (or, worst case, memory just past it).
 void fb_put_pixel(uint32_t x, uint32_t y, uint32_t color);
+
+// Reads a single pixel back from the back-buffer. No bounds checking,
+// same contract as fb_put_pixel -- callers must stay within
+// [0, width) x [0, height). Used by callers that need to save/restore
+// a region before drawing over it (e.g. a mouse cursor, see mouse
+// refresh code) rather than redrawing everything.
+uint32_t fb_get_pixel(uint32_t x, uint32_t y);
+
+// Copies the entire back-buffer to the real framebuffer (VRAM) in one
+// sequential pass. Call this once per frame, after all drawing for
+// that frame is done -- fb_clear/fb_put_pixel/fb_draw_* never touch
+// VRAM directly, so nothing is visible on screen until fb_present()
+// runs. No-op if fb_init() hasn't succeeded.
+void fb_present(void);
 
 #endif // APEX_FRAMEBUFFER_H

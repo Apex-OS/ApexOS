@@ -32,11 +32,12 @@ int axd_driver_count = 0;
 // HEAP_START (see mm/heap.h): the mapping overwrote the first page of
 // the kernel heap (including heap_head itself), silently corrupting
 // the structure and causing a GPF later on the first allocation/free
-// touching that zone. The heap occupies [0x800000, 0xC00000)
-// (HEAP_START + HEAP_MAX_SIZE = 4MB) -- 0xD00000 was chosen with
-// headroom beyond that to avoid any future overlap if HEAP_MAX_SIZE
-// grows.
-#define AXD_BASE_ADDR 0xD00000ull
+// touching that zone. The heap occupies [0x800000, 0x1000000)
+// (HEAP_START + HEAP_MAX_SIZE = 16MB, grown from 4MB to fit the
+// graphics back-buffer -- see mm/heap.h) -- 0x1100000 (17MB) was
+// chosen with the same 1MB headroom beyond the heap's end as before,
+// in case HEAP_MAX_SIZE grows again.
+#define AXD_BASE_ADDR 0x1100000ull
 
 #define AXD_MAX_FILE_SIZE 4096u
 

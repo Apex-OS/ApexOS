@@ -1,5 +1,6 @@
 // apex-kernel/drivers/mouse.c
-// ApexOS -- PS/2 mouse driver, wheel only (IntelliMouse extension)
+// ApexOS -- PS/2 mouse driver: wheel (IntelliMouse extension) and
+// absolute position/button tracking for graphics mode.
 //
 // Standard PS/2 mouse = 3-byte packets (buttons, delta X, delta Y).
 // The IntelliMouse extension adds a 4th byte (wheel delta) after an
@@ -48,6 +49,35 @@ static uint8_t mouse_read(void)
 static uint8_t packet[4];
 static uint8_t packet_index = 0;
 static bool has_wheel = false;
+
+// Absolute position, accumulated from the relative deltas each packet
+// reports (see mouse_handler() -- PS/2 mice only ever report movement
+// since the last packet, never a real position). Starts at (0,0) --
+// callers wanting a centered/specific starting point should draw
+// their own initial cursor rather than relying on this default.
+static mouse_state_t state = {0, 0, false, false, false};
+
+// Bounds the position is clamped to, set via mouse_set_bounds().
+// Defaults to a huge range so tracking is harmless (just unclamped)
+// before graphics mode is initialized.
+static int32_t bound_max_x = 0x7FFFFFFF;
+static int32_t bound_max_y = 0x7FFFFFFF;
+
+void mouse_set_bounds(int32_t max_x, int32_t max_y)
+{
+    bound_max_x = max_x;
+    bound_max_y = max_y;
+
+    if (state.x > bound_max_x)
+        state.x = bound_max_x;
+    if (state.y > bound_max_y)
+        state.y = bound_max_y;
+}
+
+mouse_state_t mouse_get_state(void)
+{
+    return state;
+}
 
 void mouse_init(void)
 {
@@ -123,6 +153,49 @@ void mouse_handler(void)
         return;
 
     packet_index = 0;
+
+    // Byte 0 (packet[0]) layout: bit0=left button, bit1=right button,
+    // bit2=middle button, bit3=always 1 (sync, already checked
+    // above), bit4=X sign, bit5=Y sign, bit6/7=X/Y overflow.
+    state.left_button = (packet[0] & 0x01) != 0;
+    state.right_button = (packet[0] & 0x02) != 0;
+    state.middle_button = (packet[0] & 0x04) != 0;
+
+    // Ignores this packet's movement entirely on overflow -- the OSDev
+    // wiki notes the sign/magnitude become unreliable once the mouse
+    // has moved further than the 9-bit counter can represent between
+    // samples (extremely fast movement); silently skipping avoids the
+    // cursor jumping to a bogus position rather than showing
+    // reasonable (if slightly stale) movement.
+    if (!(packet[0] & 0xC0))
+    {
+        // Bytes 1/2 are 8-bit magnitudes; the matching sign bit from
+        // byte 0 sign-extends them into a real 9-bit two's complement
+        // delta -- see the file header for the PS/2 packet layout.
+        int32_t delta_x = packet[1];
+        if (packet[0] & 0x10)
+            delta_x -= 256;
+
+        int32_t delta_y = packet[2];
+        if (packet[0] & 0x20)
+            delta_y -= 256;
+
+        // PS/2 Y is positive going UP the screen; framebuffer Y is
+        // positive going DOWN (row 0 = top) -- flipped here so
+        // "moving the mouse up" moves the cursor up on screen, not
+        // down.
+        state.x -= delta_x;
+        state.y += delta_y;
+
+        if (state.x < 0)
+            state.x = 0;
+        if (state.y < 0)
+            state.y = 0;
+        if (state.x > bound_max_x)
+            state.x = bound_max_x;
+        if (state.y > bound_max_y)
+            state.y = bound_max_y;
+    }
 
     if (has_wheel)
     {

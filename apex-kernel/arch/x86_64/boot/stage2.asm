@@ -63,6 +63,14 @@ VBE_INFO_ADDR       equ 0x9000 ; 512-byte VbeInfoBlock (function 4F00h)
 VBE_MODE_INFO_ADDR  equ 0x9200 ; 256-byte ModeInfoBlock, reused per candidate mode (function 4F01h)
 VBE_RESULT_ADDR     equ 0x9300 ; final chosen-mode summary, read by the kernel (see drivers/framebuffer.h)
 
+; Upper bound on the resolution detect_vbe_mode will pick -- see the
+; comment at the width/height rejection check below for why (kernel
+; back-buffer sizing). 1600x900 chosen to match the resolution already
+; in use -- HEAP_MAX_SIZE (mm/heap.h) was grown to 8MB specifically to
+; fit this size back-buffer (1600*900*4 = ~5.76MB) with headroom.
+MAX_FB_WIDTH        equ 1600
+MAX_FB_HEIGHT       equ 900
+
 PML4_ADDR           equ 0x1000
 PDPT_ADDR           equ 0x2000
 PD_ADDR             equ 0x3000
@@ -307,6 +315,21 @@ detect_vbe_mode:
     mov al, [VBE_MODE_INFO_ADDR + 0x19]
     cmp al, 32
     jne .next_mode
+
+    ; Rejects any mode wider than MAX_FB_WIDTH or taller than
+    ; MAX_FB_HEIGHT before comparing it as a candidate -- the kernel's
+    ; graphics back-buffer (drivers/framebuffer_draw.c, double
+    ; buffering) is allocated with kmalloc() out of a 4MB heap
+    ; (mm/heap.h), so an uncapped "pick the biggest available" mode
+    ; could pick a resolution whose back-buffer (width*height*4 bytes)
+    ; doesn't fit. 1024x768x4 = 3MB, safely inside the heap alongside
+    ; other allocations.
+    mov ax, [VBE_MODE_INFO_ADDR + 0x12] ; width
+    cmp ax, MAX_FB_WIDTH
+    ja .next_mode
+    mov ax, [VBE_MODE_INFO_ADDR + 0x14] ; height
+    cmp ax, MAX_FB_HEIGHT
+    ja .next_mode
 
     ; Keeps this mode if its width*height is bigger than the best seen
     ; so far. Compares width first, then height, rather than the true
