@@ -31,6 +31,21 @@ typedef enum
 } vga_color_t;
 
 void vga_init(void);
+
+// Switches every vga_* function below to render through fbcon.c (see
+// drivers/fbcon.h) instead of real VGA text-mode memory (0xB8000).
+// Call once, from kernel.c, after fb_init() has succeeded -- calling
+// this before fb_init() succeeded, or on a machine where it never
+// does, would forward into an uninitialized/nonexistent framebuffer.
+// One-way in v1: no matching vga_disable_graphics_mode(), since
+// nothing currently needs to switch back once graphics mode is up.
+void vga_enable_graphics_mode(void);
+
+// Returns true if vga_enable_graphics_mode() has been called and is
+// currently active -- lets callers that care (e.g. print_sysinfo() in
+// kernel.c) report which console is actually in use.
+bool vga_is_graphics_mode(void);
+
 void vga_clear(void);
 void vga_set_color(vga_color_t fg, vga_color_t bg);
 void vga_putchar(char c);

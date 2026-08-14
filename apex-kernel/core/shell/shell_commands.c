@@ -12,6 +12,7 @@
 #include "../../fs/axfs.h"
 #include "../../fs/vfs.h"
 #include "../../drivers/framebuffer.h"
+#include "../../drivers/fbcon.h"
 #include "../../drivers/framebuffer_draw.h"
 #include "../../drivers/mouse.h"
 #include "../../drivers/keyboard.h"
@@ -422,7 +423,14 @@ static void gfxtest_draw_scene(fb_info_t info)
 
 void cmd_gfxtest(void)
 {
-    if (!fb_init())
+    // TEST TEMPORAIRE -- fb_init() est maintenant aussi appelée au
+    // boot (voir kernel.c), donc la rappeler ici double-alloue le
+    // back-buffer et fait échouer kmalloc. fb_get_info() retourne des
+    // valeurs à zéro si jamais fb_init() n'a jamais réussi, donc ce
+    // check est un moyen simple de savoir si on peut sauter le second
+    // appel. A restaurer une fois ce test terminé.
+    fb_info_t already = fb_get_info();
+    if (already.width == 0 && !fb_init())
     {
         klog_error("gfxtest: no usable graphics mode -- staying in text mode");
         return;
@@ -442,7 +450,7 @@ void cmd_gfxtest(void)
     mouse_state_t last_state = mouse_get_state();
     fb_save_cursor_bg((uint32_t)last_state.x, (uint32_t)last_state.y);
     fb_draw_cursor((uint32_t)last_state.x, (uint32_t)last_state.y, FB_RGB(255, 255, 255));
-    fb_present(); // pushes the first frame to VRAM -- see the double-buffering note in framebuffer.h
+    fb_present(); // first frame: full copy is fine, happens once
 
     // Exits on any keypress -- no mode-switch back to VGA text yet
     // (see the file-level comment on cmd_gfxtest's one-way nature),
@@ -460,9 +468,34 @@ void cmd_gfxtest(void)
             fb_restore_cursor_bg((uint32_t)last_state.x, (uint32_t)last_state.y);
             fb_save_cursor_bg((uint32_t)state.x, (uint32_t)state.y);
             fb_draw_cursor((uint32_t)state.x, (uint32_t)state.y, FB_RGB(255, 255, 255));
-            fb_present(); // one sequential VRAM copy per frame -- no more flicker
+
+            // Presents only the bounding box covering both the old and
+            // new cursor position, instead of the whole screen -- at
+            // 1600x900 fb_present() was copying ~5.76MB every single
+            // mouse-move frame, capping this well under 60fps. The
+            // union of both FB_CURSOR_W x FB_CURSOR_H boxes is at most
+            // a few thousand pixels, however far the mouse moved in
+            // one frame.
+            int32_t min_x = last_state.x < state.x ? last_state.x : state.x;
+            int32_t min_y = last_state.y < state.y ? last_state.y : state.y;
+            int32_t max_x = last_state.x > state.x ? last_state.x : state.x;
+            int32_t max_y = last_state.y > state.y ? last_state.y : state.y;
+            fb_present_rect((uint32_t)min_x, (uint32_t)min_y,
+                            (uint32_t)(max_x - min_x) + FB_CURSOR_W,
+                            (uint32_t)(max_y - min_y) + FB_CURSOR_H);
+
             last_state = state;
         }
     }
     keyboard_getchar(); // consumes the keypress that ended the loop
+
+    // Clears the framebuffer console back to a blank screen before
+    // returning to the shell -- with fbcon_putchar() now only
+    // presenting the cell it actually touches (see fb_present_rect()
+    // in framebuffer.c), nothing else repaints the rest of the screen
+    // automatically the way the old full-screen fb_present() used to.
+    // Without this, the shell's next prompt would just get drawn on
+    // top of gfxtest's last frame instead of a clean background.
+    if (vga_is_graphics_mode())
+        fbcon_clear();
 }

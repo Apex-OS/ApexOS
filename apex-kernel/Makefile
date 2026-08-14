@@ -52,6 +52,7 @@ C_SRCS    := core/kernel.c            \
              core/axf/axf_loader.c    \
              core/axf/axd.c           \
              drivers/vga.c            \
+             drivers/fbcon.c          \
              drivers/framebuffer.c    \
              drivers/framebuffer_draw.c \
              drivers/font8x8.c        \
@@ -141,6 +142,28 @@ run: all
 		-serial stdio                \
 		-no-reboot                   \
 		-no-shutdown                 \
+		-display sdl
+
+run-emergency: all
+	@echo "  QEMU    Launching ApexOS (Fallback Test)..."
+	@qemu-system-x86_64              \
+		-drive file=$(BUILD)/apex.img,format=raw,index=0,media=disk \
+		-m 256M                      \
+		-serial stdio                \
+		-vga cirrus                  \
+		-display sdl
+
+run-debug-int: all
+	@echo "  QEMU    Launching with interrupt logging..."
+	@qemu-system-x86_64              \
+		-drive file=$(BUILD)/apex.img,format=raw,index=0,media=disk \
+		-m 256M                      \
+		-serial stdio                \
+		-no-reboot                   \
+		-no-shutdown                 \
+		-accel tcg                   \
+		-d int,cpu_reset              \
+		-D qemu-debug.log             \
 		-display sdl
 
 # ── QEMU + GDB debug ───────────────────────────────────────────────────────

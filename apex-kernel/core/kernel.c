@@ -9,6 +9,7 @@
 #include "syscall.h"
 #include "userspace.h"
 #include "../drivers/vga.h"
+#include "../drivers/framebuffer.h"
 #include "../drivers/pic.h"
 #include "../drivers/pit.h"
 #include "../drivers/serial.h"
@@ -32,7 +33,10 @@
 static void print_sysinfo(void)
 {
     klog_ok_hex("Kernel loaded at", 0x100000);
-    klog_ok("VGA driver initialized (80x25)");
+    if (vga_is_graphics_mode())
+        klog_ok("Console: framebuffer text mode (see drivers/fbcon.c)");
+    else
+        klog_ok("VGA driver initialized (80x25)");
     klog_ok("Long mode active - x86-64");
     klog_ok("GDT initialized (5 descriptors)");
     klog_ok("IDT initialized (256 entries)");
@@ -65,6 +69,7 @@ void kmain(void)
     // guaranteed, so any output before serial_init() risked hanging
     // the boot right here.
     serial_init();
+
     gdt_init();
     tss_init();
     pic_init();
@@ -78,6 +83,38 @@ void kmain(void)
     vmm_print_stats();
     heap_init();
     heap_print_stats();
+
+    // Switches text output to render inside the VESA/VBE framebuffer
+    // (see drivers/fbcon.c) instead of real VGA text-mode memory --
+    // stage2.asm already put the machine in graphics mode at boot
+    // (see arch/x86_64/boot/stage2.asm: detect_vbe_mode), so without
+    // this every vga_puts/klog call from here on would write to
+    // 0xB8000 memory nothing is scanning out to the screen, and the
+    // QEMU window would stay black while output only ever reached the
+    // serial mirror.
+    //
+    // MUST run after heap_init() above, not before -- fb_init()
+    // allocates the graphics back-buffer with kmalloc() (see
+    // drivers/framebuffer.c), and calling it before the heap exists
+    // makes that kmalloc() fail every time, silently falling back to
+    // VGA text mode. (First version of this code called fb_init()
+    // right after serial_init(), before any memory init -- caught via
+    // the "[ERROR] fb_init: kmalloc failed for back-buffer" log line,
+    // followed immediately by "[OK] Heap initialized" further down:
+    // proof the heap genuinely didn't exist yet at the point fb_init()
+    // ran.)
+    //
+    // Consequence: GDT/IDT/PIC/PMM/VMM/heap init messages above this
+    // point are only ever printed via real VGA text mode (and its
+    // serial mirror) -- never in the framebuffer console, even on a
+    // successful graphics boot. Only output from here on (AXFS init,
+    // the shell, etc.) can appear in the QEMU window. Falls back to
+    // real VGA text mode automatically if fb_init() fails for any
+    // other reason (no suitable VBE mode found) -- vga_enable_graphics_mode()
+    // is simply never called in that case, and every vga_* function
+    // keeps working exactly as it always has.
+    if (fb_init())
+        vga_enable_graphics_mode();
 
     // Init filesystem (AXFS -- RAM disk for this V1, see fs/axfs.c).
     axfs_init();
@@ -157,6 +194,20 @@ void kmain(void)
     mouse_init();
     pic_unmask_irq(2);  // slave PIC cascade -- needed for IRQ8-15
     pic_unmask_irq(12); // mouse
+
+    // Clamps mouse tracking to the real screen bounds now that
+    // graphics mode is up (see fb_init()/vga_enable_graphics_mode()
+    // above) -- same call gfxtest makes on its own (see
+    // shell_commands.c: cmd_gfxtest), done here too so the bound is
+    // already correct for any future code that draws a cursor outside
+    // that one test command. No-op (harmless) if fb_init() failed and
+    // the machine is on VGA text mode -- mouse.c just keeps tracking
+    // unclamped, as documented in mouse.h.
+    {
+        fb_info_t info = fb_get_info();
+        if (info.width > 0 && info.height > 0)
+            mouse_set_bounds((int32_t)info.width - 1, (int32_t)info.height - 1);
+    }
 
     // Init scheduler + PIT.
     scheduler_init();

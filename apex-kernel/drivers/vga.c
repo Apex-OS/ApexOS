@@ -4,6 +4,30 @@
 #include "vga.h"
 #include "../include/apex/io.h"
 #include "serial.h"
+#include "fbcon.h"
+
+// Set once by vga_enable_graphics_mode() (called from kernel.c after
+// fb_init() succeeds) -- every public function below checks this
+// first and forwards to the matching fbcon_* function when true.
+// Function NAMES stay the same on purpose: ~200 call sites across the
+// kernel already call vga_puts/vga_putchar/etc, and this flag lets
+// all of them transparently render into the framebuffer instead of
+// real VGA text-mode memory (0xB8000) without touching any of them.
+// Stays false (real VGA text mode + serial mirror) if fb_init() never
+// succeeds or is never called -- e.g. a machine with no usable VBE
+// mode -- so text output always works one way or another.
+static bool graphics_mode = false;
+
+void vga_enable_graphics_mode(void)
+{
+    graphics_mode = true;
+    fbcon_init();
+}
+
+bool vga_is_graphics_mode(void)
+{
+    return graphics_mode;
+}
 
 // All writes go into an in-RAM history buffer (SCROLLBACK_LINES
 // lines) instead of writing directly to VGA memory. VGA memory only
@@ -20,8 +44,8 @@ static uint16_t *vga_hw = VGA_MEMORY; // real VGA memory (display only)
 static uint8_t vga_col = 0;
 static uint8_t vga_row = 0; // on-screen write row (0..VGA_HEIGHT-1); matches write_row when scroll_offset=0
 static uint8_t vga_attr = 0;
-uint8_t vga_get_row(void) { return vga_row; }
-uint8_t vga_get_col(void) { return vga_col; }
+uint8_t vga_get_row(void) { return graphics_mode ? fbcon_get_row() : vga_row; }
+uint8_t vga_get_col(void) { return graphics_mode ? fbcon_get_col() : vga_col; }
 
 static inline uint8_t vga_make_attr(vga_color_t fg, vga_color_t bg)
 {
@@ -101,6 +125,12 @@ void vga_init(void)
 
 void vga_clear(void)
 {
+    if (graphics_mode)
+    {
+        fbcon_clear();
+        return;
+    }
+
     for (uint32_t i = 0; i < SCROLLBACK_LINES; i++)
         for (uint8_t c = 0; c < VGA_WIDTH; c++)
             scrollback[i][c] = vga_make_entry(' ', vga_attr);
@@ -115,11 +145,22 @@ void vga_clear(void)
 
 void vga_set_color(vga_color_t fg, vga_color_t bg)
 {
+    if (graphics_mode)
+    {
+        fbcon_set_color(fg, bg);
+        return;
+    }
     vga_attr = vga_make_attr(fg, bg);
 }
 
 void vga_putchar(char c)
 {
+    if (graphics_mode)
+    {
+        fbcon_putchar(c);
+        return;
+    }
+
     // Mirrors every character to COM1 -- lets serial output (QEMU
     // `-serial file:...` or `-serial stdio`) capture exactly what
     // appears on screen, with no separate logging path to keep in
@@ -187,6 +228,11 @@ void vga_putchar(char c)
 
 void vga_puts(const char *str)
 {
+    if (graphics_mode)
+    {
+        fbcon_puts(str);
+        return;
+    }
     while (*str)
         vga_putchar(*str++);
     vga_present();
@@ -236,12 +282,23 @@ void vga_putdec(uint64_t value)
 
 void vga_hide_cursor(void)
 {
+    if (graphics_mode)
+    {
+        fbcon_hide_cursor();
+        return;
+    }
     outb(0x3D4, 0x0A);
     outb(0x3D5, 0x20);
 }
 
 void vga_show_cursor(void)
 {
+    if (graphics_mode)
+    {
+        fbcon_show_cursor();
+        return;
+    }
+
     uint16_t pos = vga_row * VGA_WIDTH + vga_col;
 
     // Re-enables the hardware cursor (restores the standard 13-15
@@ -260,12 +317,23 @@ void vga_show_cursor(void)
 
 void vga_set_cursor_pos(uint8_t row, uint8_t col)
 {
+    if (graphics_mode)
+    {
+        fbcon_set_cursor_pos(row, col);
+        return;
+    }
     vga_row = row;
     vga_col = col;
 }
 
 void vga_write_at(uint8_t row, uint8_t col, char c)
 {
+    if (graphics_mode)
+    {
+        fbcon_write_at(row, col, c);
+        return;
+    }
+
     if (row >= VGA_HEIGHT || col >= VGA_WIDTH)
         return;
 
@@ -281,12 +349,22 @@ void vga_write_at(uint8_t row, uint8_t col, char c)
 // ── Scrollback: mouse wheel API ─────────────────────────────────────────
 void vga_scroll_up(uint32_t lines)
 {
+    if (graphics_mode)
+    {
+        fbcon_scroll_up(lines);
+        return;
+    }
     scroll_offset += lines;
     vga_present();
 }
 
 void vga_scroll_down(uint32_t lines)
 {
+    if (graphics_mode)
+    {
+        fbcon_scroll_down(lines);
+        return;
+    }
     if (lines > scroll_offset)
         scroll_offset = 0;
     else

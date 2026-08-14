@@ -30,4 +30,12 @@ void pmm_free_page(void *addr);
 void pmm_stats(pmm_stats_t *stats);
 void pmm_print_stats(void);
 
+// Highest physical address (exclusive) the PMM knows about. Used by
+// vmm_init() to size the identity map so it covers all physical
+// memory pmm_alloc_page() can ever hand out, not just an arbitrary
+// fixed cutoff -- a cutoff smaller than this lets pmm_alloc_page()
+// hand out pages that were never mapped anywhere, including pages
+// vmm_get_or_create() itself allocates for new PDPT/PD/PT tables.
+uint64_t pmm_get_total_bytes(void);
+
 #endif // APEX_PMM_H

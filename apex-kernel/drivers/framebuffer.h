@@ -63,6 +63,18 @@ bool fb_init(void);
 // successful fb_init().
 fb_info_t fb_get_info(void);
 
+// Same data as fb_get_info(), but returns a pointer to the live
+// fb_info_t instead of a copy -- fb_info_t is 20 bytes (over the
+// 16-byte limit for returning a struct in registers on x86-64 System
+// V), so fb_get_info() returns via a hidden out-parameter the
+// compiler manages; that's fine for occasional calls, but callers
+// that invoke it many times per frame (e.g. clip_rect() in
+// framebuffer_draw.c, called for every glyph fill in fbcon.c's text
+// rendering -- thousands of times per frame) should use this instead
+// to skip the copy. Never NULL after a successful fb_init(); result
+// is read-only, don't modify through it.
+const fb_info_t *fb_get_info_ptr(void);
+
 // Fills the entire framebuffer with a single color.
 void fb_clear(uint32_t color);
 
@@ -84,5 +96,15 @@ uint32_t fb_get_pixel(uint32_t x, uint32_t y);
 // VRAM directly, so nothing is visible on screen until fb_present()
 // runs. No-op if fb_init() hasn't succeeded.
 void fb_present(void);
+
+// Same as fb_present(), but only copies the given rectangle instead
+// of the whole screen. Use this whenever only a small region actually
+// changed (a single character cell, a cursor) -- fb_present() copying
+// the full back-buffer (up to ~5.76MB at 1600x900) on every keystroke
+// is the difference between a terminal that keeps up with typing and
+// one that visibly lags behind it. Clipped to the framebuffer bounds,
+// same as fb_fill_rect -- safe to call with a rect that runs off an
+// edge.
+void fb_present_rect(uint32_t x, uint32_t y, uint32_t w, uint32_t h);
 
 #endif // APEX_FRAMEBUFFER_H
