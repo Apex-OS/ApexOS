@@ -32,12 +32,12 @@ void fb_draw_rect(uint32_t x, uint32_t y, uint32_t w, uint32_t h, uint32_t thick
 void fb_draw_line(int32_t x0, int32_t y0, int32_t x1, int32_t y1, uint32_t color);
 
 // Draws a null-terminated string starting at (x, y) (top-left corner
-// of the first glyph), scaled by `scale` (1 = native 8x8 pixels per
-// glyph, 2 = 16x16, etc. -- 0 is treated as 1). Characters not covered
-// by the built-in font (see font8x8.h) render as a blank cell rather
-// than garbage. No wrapping -- text running past the right edge is
-// clipped character-by-character via fb_put_pixel's normal bounds
-// checking inside the glyph-drawing loop.
+// of the first glyph), scaled by `scale` (1 = native 8x16 pixels per
+// glyph, 2 = 16x32, etc. -- 0 is treated as 1). Covers the full CP437
+// codepage (see font8x16.h) -- every byte value has a real glyph, no
+// blank-cell fallback needed. No wrapping -- text running past the
+// right edge is clipped character-by-character via fb_put_pixel's
+// normal bounds checking inside the glyph-drawing loop.
 void fb_draw_text(uint32_t x, uint32_t y, const char *text, uint32_t scale, uint32_t color);
 
 // Draws a simple arrow-shaped mouse cursor with its hotspot (the tip)

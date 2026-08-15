@@ -46,6 +46,15 @@ void vga_enable_graphics_mode(void);
 // kernel.c) report which console is actually in use.
 bool vga_is_graphics_mode(void);
 
+// Controls whether every character shown via vga_putchar()/
+// fbcon_putchar() is also mirrored to COM1 (see drivers/serial.h).
+// Off by default -- a normal interactive session no longer spams
+// whatever's attached to the serial port. Turn this on for tooling
+// that specifically needs it (e.g. tools/tests/run_tests.sh, run
+// headless and reading output from the serial line).
+void vga_set_serial_mirror(bool enabled);
+bool vga_get_serial_mirror(void);
+
 void vga_clear(void);
 void vga_set_color(vga_color_t fg, vga_color_t bg);
 void vga_putchar(char c);

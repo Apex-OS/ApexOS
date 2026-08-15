@@ -4,17 +4,20 @@
 #include "fbcon.h"
 #include "framebuffer.h"
 #include "framebuffer_draw.h"
-#include "font8x8.h"
+#include "font8x16.h"
 #include "serial.h"
 
-// Glyph cell size on screen -- FONT8X8_WIDTH/HEIGHT scaled up (see
-// fb_draw_text's `scale` parameter). 2 chosen for readability at
-// 1600x900 (see stage2.asm: MAX_FB_WIDTH/HEIGHT) -- gives a ~100x56
-// character grid, close enough to VGA text mode's 80x25 to feel
-// familiar while using the extra resolution.
-#define FBCON_SCALE 2
-#define FBCON_GLYPH_W (FONT8X8_WIDTH * FBCON_SCALE)
-#define FBCON_GLYPH_H (FONT8X8_HEIGHT * FBCON_SCALE)
+// Glyph cell size on screen -- FONT8X16_WIDTH/HEIGHT scaled up (see
+// fb_draw_text's `scale` parameter). 1 (native size) chosen now that
+// the font itself is the real VGA BIOS CP437 8x16 font (see
+// font8x16.h) -- it's designed to be crisp at its native size, the
+// way real VGA text mode always rendered it, so no scaling is needed
+// the way font8x8.c's smaller glyphs needed 2x to stay readable at
+// 1600x900. Gives a ~200x56 character grid at 1600x900 (see
+// stage2.asm: MAX_FB_WIDTH/HEIGHT).
+#define FBCON_SCALE 1
+#define FBCON_GLYPH_W (FONT8X16_WIDTH * FBCON_SCALE)
+#define FBCON_GLYPH_H (FONT8X16_HEIGHT * FBCON_SCALE)
 
 // Scrollback depth, in lines -- same value as vga.c's SCROLLBACK_LINES
 // for consistent history length regardless of which console is
@@ -23,7 +26,7 @@
 // static allocation (heap usage is already tight -- see mm/heap.h --
 // and this avoids one more kmalloc'd structure to track).
 #define FBCON_SCROLLBACK_LINES 500
-#define FBCON_MAX_WIDTH 200 // generous headroom above the ~100 cols 1600px/16px actually gives
+#define FBCON_MAX_WIDTH 256 // headroom above the 200 cols 1600px/8px gives (font8x16.h, scale=1)
 
 typedef struct
 {
@@ -237,11 +240,12 @@ void fbcon_set_color(vga_color_t fg, vga_color_t bg)
 
 void fbcon_putchar(char c)
 {
-    // Mirrors to serial too -- same reasoning as vga_putchar(): keeps
-    // tools/tests/run_tests.sh (headless, reads serial output) working
-    // identically whether the kernel booted into VGA text mode or
-    // graphics mode.
-    serial_putchar(c);
+    // Mirrors to serial too, only when explicitly turned on -- see
+    // vga_set_serial_mirror() in vga.c, which owns this flag (shared
+    // with vga_putchar() so both text-output paths behave the same
+    // way regardless of which one is active).
+    if (vga_get_serial_mirror())
+        serial_putchar(c);
 
     if (c == '\n')
     {
@@ -376,8 +380,27 @@ void fbcon_puts(const char *str)
 
 void fbcon_set_cursor_pos(uint8_t row, uint8_t col)
 {
+    if (row == cur_row && col == cur_col)
+        return; // nothing moved, nothing to redraw
+
+    // Erases the cursor at its old position first (redraws that
+    // cell's real, non-inverted content) -- otherwise it's left
+    // showing as a solid inverted block there permanently once
+    // nothing else repaints the whole screen per keystroke (see
+    // fb_present_rect() in framebuffer.c).
+    if (cur_row < grid_height && cur_col < grid_width)
+    {
+        uint32_t first = 0;
+        if (total_lines > grid_height)
+            first = total_lines - grid_height;
+        first -= scroll_offset;
+        fbcon_cell_t *old_cell = &scrollback[(first + cur_row) % FBCON_SCROLLBACK_LINES][cur_col];
+        fbcon_draw_cell_present(cur_row, cur_col, old_cell->c ? old_cell->c : ' ', old_cell->attr);
+    }
+
     cur_row = row;
     cur_col = col;
+    fbcon_draw_cursor_present();
 }
 
 void fbcon_write_at(uint8_t row, uint8_t col, char c)

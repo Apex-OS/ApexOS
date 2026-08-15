@@ -18,6 +18,26 @@
 // mode -- so text output always works one way or another.
 static bool graphics_mode = false;
 
+// Off by default -- vga_putchar()/fbcon_putchar() only mirror to
+// serial when this is explicitly turned on (see
+// vga_set_serial_mirror()). Was always-on before, which meant every
+// character shown on screen (including the whole shell session) was
+// also written out COM1 -- noisy for day-to-day use in a terminal
+// attached to that port. Tools that actually need the serial mirror
+// (tools/tests/run_tests.sh, run headless and reading serial output)
+// can turn it on for the duration of that run.
+static bool serial_mirror_enabled = false;
+
+void vga_set_serial_mirror(bool enabled)
+{
+    serial_mirror_enabled = enabled;
+}
+
+bool vga_get_serial_mirror(void)
+{
+    return serial_mirror_enabled;
+}
+
 void vga_enable_graphics_mode(void)
 {
     graphics_mode = true;
@@ -161,16 +181,15 @@ void vga_putchar(char c)
         return;
     }
 
-    // Mirrors every character to COM1 -- lets serial output (QEMU
+    // Mirrors every character to COM1, only when explicitly turned on
+    // (see vga_set_serial_mirror()) -- lets serial output (QEMU
     // `-serial file:...` or `-serial stdio`) capture exactly what
     // appears on screen, with no separate logging path to keep in
     // sync. Used by tools/tests/run_tests.sh to check boot/test output
-    // without a real display. serial_init() must have run first (see
-    // kernel.c) -- called well before the earliest vga_putchar() in
-    // practice, but writing to an uninitialized COM1 before that is
-    // harmless (the UART ignores writes if not configured) so no
-    // ordering guard is needed here.
-    serial_putchar(c);
+    // without a real display; off by default so a normal interactive
+    // session doesn't spam whatever's attached to COM1.
+    if (serial_mirror_enabled)
+        serial_putchar(c);
 
     if (c == '\n')
     {

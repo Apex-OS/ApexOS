@@ -3,7 +3,7 @@
 
 #include "framebuffer_draw.h"
 #include "framebuffer.h"
-#include "font8x8.h"
+#include "font8x16.h"
 
 // Clamps a rectangle to the framebuffer's actual bounds. Returns false
 // if the rectangle is entirely off-screen (nothing to draw) -- callers
@@ -11,15 +11,15 @@
 // since x+w or y+h can wrap/overflow for pathological inputs.
 static bool clip_rect(uint32_t *x, uint32_t *y, uint32_t *w, uint32_t *h)
 {
-    fb_info_t info = fb_get_info();
+    const fb_info_t *info = fb_get_info_ptr();
 
-    if (*x >= info.width || *y >= info.height)
+    if (*x >= info->width || *y >= info->height)
         return false;
 
-    if (*x + *w > info.width)
-        *w = info.width - *x;
-    if (*y + *h > info.height)
-        *h = info.height - *y;
+    if (*x + *w > info->width)
+        *w = info->width - *x;
+    if (*y + *h > info->height)
+        *h = info->height - *y;
 
     return *w > 0 && *h > 0;
 }
@@ -98,17 +98,17 @@ void fb_draw_text(uint32_t x, uint32_t y, const char *text, uint32_t scale, uint
     if (scale == 0)
         scale = 1;
 
-    fb_info_t info = fb_get_info();
+    const fb_info_t *info = fb_get_info_ptr();
     uint32_t cursor_x = x;
 
     for (const char *p = text; *p; p++)
     {
-        const uint8_t *glyph = font8x8_get_glyph(*p);
+        const uint8_t *glyph = font8x16_get_glyph(*p);
 
-        for (uint32_t row = 0; row < FONT8X8_HEIGHT; row++)
+        for (uint32_t row = 0; row < FONT8X16_HEIGHT; row++)
         {
             uint8_t bits = glyph[row];
-            for (uint32_t col = 0; col < FONT8X8_WIDTH; col++)
+            for (uint32_t col = 0; col < FONT8X16_WIDTH; col++)
             {
                 if (!(bits & (0x80 >> col)))
                     continue; // pixel off -- background left untouched (no per-glyph clear)
@@ -119,13 +119,13 @@ void fb_draw_text(uint32_t x, uint32_t y, const char *text, uint32_t scale, uint
                 // scale > 1.
                 uint32_t px = cursor_x + col * scale;
                 uint32_t py = y + row * scale;
-                if (px >= info.width || py >= info.height)
+                if (px >= info->width || py >= info->height)
                     continue;
                 fb_fill_rect(px, py, scale, scale, color);
             }
         }
 
-        cursor_x += FONT8X8_WIDTH * scale;
+        cursor_x += FONT8X16_WIDTH * scale;
     }
 }
 
