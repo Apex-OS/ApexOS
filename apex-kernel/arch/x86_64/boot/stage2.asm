@@ -9,7 +9,17 @@
 KERNEL_TMP_SEG      equ 0x1000
 KERNEL_TMP_OFF      equ 0x0000
 KERNEL_FINAL_ADDR   equ 0x100000
-KERNEL_SECTORS      equ 160        ; BUG FIX: was 128 (64KB) -- kernel.bin
+KERNEL_SECTORS      equ 200        ; Grown from 160 to fit ahci.c/pci.c --
+                                    ; kernel.bin (82768 bytes as of this
+                                    ; change) exceeded 160 sectors (81920
+                                    ; bytes), truncating the loaded kernel
+                                    ; and causing a silent hang before the
+                                    ; first boot log (confirmed: build
+                                    ; succeeded, but nothing appeared on
+                                    ; serial even though TSS init is the
+                                    ; very first thing kmain() logs).
+                                    ; 200 sectors = 100KB, ~19KB headroom
+                                    ; above the kernel's current size.
                                     ; grew past that (66368 bytes, needs 130
                                     ; sectors minimum) once the framebuffer
                                     ; driver and VBE-related code were added.

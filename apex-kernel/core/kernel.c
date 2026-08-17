@@ -15,6 +15,8 @@
 #include "../drivers/serial.h"
 #include "../drivers/keyboard.h"
 #include "../drivers/mouse.h"
+#include "../drivers/pci.h"
+#include "../drivers/ahci.h"
 #include "../include/apex/mmap.h"
 #include "../mm/pmm.h"
 #include "../mm/vmm.h"
@@ -212,6 +214,21 @@ void kmain(void)
     // Init scheduler + PIT.
     scheduler_init();
     pit_init();
+
+    // First step toward real disk persistence (see project notes).
+    // Detects the AHCI controller, initializes its first port with a
+    // real SATA drive, and issues an IDENTIFY command -- validates
+    // the whole AHCI plumbing (MMIO mapping, command list, FIS,
+    // PRDT) works end to end. axfs_disk.c's future real-disk backend
+    // builds on ahci_read_sectors()/ahci_drive_info() from here.
+    // Non-fatal if it fails: the RAM disk backend keeps working
+    // exactly as it always has either way.
+    //
+    // MUST run after pit_init() above, not before -- ahci_init()'s
+    // command timeouts (see ahci.c: ahci_wait_clear()) are measured
+    // via pit_get_ticks(), which only advances once the PIT is
+    // actually initialized and ticking.
+    ahci_init();
 
     // Creates the shell process.
     process_t *shell = process_create("shell", shell_run);

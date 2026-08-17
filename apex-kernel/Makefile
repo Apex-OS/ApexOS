@@ -16,6 +16,9 @@ CFLAGS    := -m64                   \
              -fno-builtin           \
              -fno-pic               \
              -mno-red-zone          \
+             -mno-sse               \
+             -mno-sse2              \
+             -mno-mmx               \
              -nostdlib              \
              -nostdinc              \
              -Wall                  \
@@ -52,6 +55,8 @@ C_SRCS    := core/kernel.c            \
              core/axf/axf_loader.c    \
              core/axf/axd.c           \
              drivers/vga.c            \
+             drivers/pci.c            \
+             drivers/ahci.c           \
              drivers/fbcon.c          \
              drivers/framebuffer.c    \
              drivers/framebuffer_draw.c \
@@ -137,6 +142,7 @@ $(BUILD)/apex.img: $(BUILD)/stage1.bin $(BUILD)/stage2.bin $(BUILD)/kernel.bin
 run: all
 	@echo "  QEMU    Launching ApexOS..."
 	@qemu-system-x86_64              \
+		-M q35                       \
 		-drive file=$(BUILD)/apex.img,format=raw,index=0,media=disk \
 		-m 256M                      \
 		-serial stdio                \
@@ -156,6 +162,7 @@ run-emergency: all
 run-debug-int: all
 	@echo "  QEMU    Launching with interrupt logging..."
 	@qemu-system-x86_64              \
+		-M q35                       \
 		-drive file=$(BUILD)/apex.img,format=raw,index=0,media=disk \
 		-m 256M                      \
 		-serial stdio                \
@@ -170,11 +177,13 @@ run-debug-int: all
 debug: all
 	@echo "  QEMU    Debug mode (GDB on port 1234)..."
 	@qemu-system-x86_64          \
+		-M q35                   \
 		-drive file=$(BUILD)/apex.img,format=raw,index=0,media=disk \
 		-m 256M                  \
 		-serial stdio            \
 		-no-reboot               \
 		-no-shutdown             \
+		-display sdl             \
 		-s -S
 
 # ── Clean ──────────────────────────────────────────────────────────────────

@@ -28,5 +28,6 @@ void cmd_rm(const char *name);
 void cmd_run(const char *name);
 
 void cmd_gfxtest(void);
+void cmd_disktest(void);
 
 #endif // APEX_SHELL_COMMANDS_H

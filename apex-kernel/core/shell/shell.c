@@ -232,6 +232,13 @@ static void shell_execute(void)
         else
             cmd_gfxtest();
     }
+    else if (str_eq(cmd_name, "disktest"))
+    {
+        if (args[0] != '\0')
+            klog_error("disktest: too many arguments");
+        else
+            cmd_disktest();
+    }
     else
     {
         klog_error_prefix();

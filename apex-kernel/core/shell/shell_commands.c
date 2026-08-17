@@ -13,6 +13,7 @@
 #include "../../fs/vfs.h"
 #include "../../drivers/framebuffer.h"
 #include "../../drivers/fbcon.h"
+#include "../../drivers/ahci.h"
 #include "../../drivers/framebuffer_draw.h"
 #include "../../drivers/mouse.h"
 #include "../../drivers/keyboard.h"
@@ -39,6 +40,7 @@ void cmd_help(void)
     vga_puts("  test    - Run kernel self-tests\n");
     vga_puts("  ring3   - Test Ring 3 userspace\n");
     vga_puts("  gfxtest - Test VESA/VBE graphics mode (one-way, see README)\n");
+    vga_puts("  disktest - Read sector 0 via AHCI and verify its boot signature\n");
 }
 
 void cmd_clear(void)
@@ -498,4 +500,107 @@ void cmd_gfxtest(void)
     // top of gfxtest's last frame instead of a clean background.
     if (vga_is_graphics_mode())
         fbcon_clear();
+}
+
+void cmd_disktest(void)
+{
+    ahci_drive_info_t info = ahci_drive_info();
+    if (!info.ready)
+    {
+        klog_error("disktest: no AHCI drive ready -- run this after a successful boot with a real disk");
+        return;
+    }
+
+    uint8_t sector[512];
+    if (!ahci_read_sectors(0, 1, sector))
+    {
+        klog_error("disktest: ahci_read_sectors(0, 1) failed");
+        return;
+    }
+
+    // Every valid boot sector (sector 0 on a bootable disk) ends with
+    // this exact two-byte signature -- it's what the BIOS itself
+    // checks before handing control to a disk's boot code. Finding it
+    // at the right offset here confirms the AHCI DMA read actually
+    // pulled real disk data, not just that the command completed
+    // without error.
+    bool signature_ok = (sector[510] == 0x55 && sector[511] == 0xAA);
+
+    klog_ok_prefix();
+    vga_puts("disktest: sector 0 boot signature ");
+    vga_puts(signature_ok ? "OK (0x55 0xAA found)" : "MISSING -- read may be wrong");
+    vga_puts("\n");
+
+    // Diagnostic: show what was actually read, to tell "wrong sector"
+    // apart from "corrupted data" apart from "read nothing at all".
+    klog_ok_prefix();
+    vga_puts("disktest: first 8 bytes: ");
+    for (int i = 0; i < 8; i++)
+    {
+        vga_puthex(sector[i]);
+        vga_puts(" ");
+    }
+    vga_puts("\n");
+    klog_ok_prefix();
+    vga_puts("disktest: bytes 508-511: ");
+    for (int i = 508; i < 512; i++)
+    {
+        vga_puthex(sector[i]);
+        vga_puts(" ");
+    }
+    vga_puts("\n");
+
+    // Write/read-back test on a sector far from anything that
+    // matters -- stage1 (sector 0), stage2 (sectors 1-32), and the
+    // kernel (sectors 34 through roughly 234, see stage2.asm:
+    // KERNEL_SECTORS) all live well before sector 1000, so writing
+    // here can't corrupt anything the bootloader or this running
+    // kernel depend on.
+    const uint64_t test_lba = 1000;
+    uint8_t write_buf[512];
+    for (int i = 0; i < 512; i++)
+        write_buf[i] = (uint8_t)(i & 0xFF); // simple repeating 0x00-0xFF pattern
+
+    if (!ahci_write_sectors(test_lba, 1, write_buf))
+    {
+        klog_error("disktest: ahci_write_sectors failed");
+        return;
+    }
+
+    uint8_t readback_buf[512];
+    if (!ahci_read_sectors(test_lba, 1, readback_buf))
+    {
+        klog_error("disktest: read-back after write failed");
+        ahci_port_debug_t dbg = ahci_port_debug_info();
+        klog_ok_prefix();
+        vga_puts("disktest: port tfd=");
+        vga_puthex(dbg.tfd);
+        vga_puts(" is=");
+        vga_puthex(dbg.is);
+        vga_puts(" serr=");
+        vga_puthex(dbg.serr);
+        vga_puts(" ci=");
+        vga_puthex(dbg.ci);
+        vga_puts(" sact=");
+        vga_puthex(dbg.sact);
+        vga_puts(" cmd=");
+        vga_puthex(dbg.cmd);
+        vga_puts("\n");
+        return;
+    }
+
+    bool write_ok = true;
+    for (int i = 0; i < 512; i++)
+    {
+        if (readback_buf[i] != write_buf[i])
+        {
+            write_ok = false;
+            break;
+        }
+    }
+
+    klog_ok_prefix();
+    vga_puts("disktest: write+read-back at sector 1000 ");
+    vga_puts(write_ok ? "OK (data matches)" : "MISMATCH");
+    vga_puts("\n");
 }
