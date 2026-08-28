@@ -3,7 +3,7 @@
 
 #include "Formats/AXF/AXP/HeaderValidation.h"
 #include "Core/Userspace.h"
-#include "ApexLib/Logs/Log.h"
+#include "Logs/Log.h"
 
 bool axp_validate_header(const axf_header_t *header)
 {

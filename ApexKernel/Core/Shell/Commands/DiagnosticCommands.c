@@ -10,9 +10,10 @@
 #include "Drivers/Display/VGA.h"
 #include "Drivers/Input/Mouse/Mouse.h"
 #include "Drivers/Input/Keyboard/Keyboard.h"
+#include "Drivers/Input/Keyboard/KeyBuffer.h"
 #include "Drivers/Storage/AHCI/AHCI.h"
 #include "Drivers/Storage/AHCI/Controller.h"
-#include "ApexLib/Logs/Log.h"
+#include "Logs/Log.h"
 
 // Smoke-tests the VESA/VBE framebuffer path (see
 // ApexKernel/Drivers/Display/Framebuffer/ and

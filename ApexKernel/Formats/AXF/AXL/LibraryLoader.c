@@ -7,7 +7,7 @@
 #include "Core/Memory/Physical/PageBitmap.h"
 #include "Core/Memory/Virtual/PageTables.h"
 #include "Drivers/Display/VGA.h"
-#include "ApexLib/Logs/Log.h"
+#include "Logs/Log.h"
 
 #define AXF_MAX_FILE_SIZE 4096u
 

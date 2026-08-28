@@ -3,15 +3,6 @@
 
 [BITS 16]
 
-extern print16
-
-global enter_protected_mode
-
-KERNEL_TMP_SEG      equ 0x1000
-KERNEL_TMP_OFF      equ 0x0000
-KERNEL_FINAL_ADDR   equ 0x100000
-KERNEL_SECTORS      equ 200
-
 PML4_ADDR           equ 0x1000
 PDPT_ADDR           equ 0x2000
 PD_ADDR             equ 0x3000

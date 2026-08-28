@@ -3,7 +3,7 @@
 
 #include "Core/Syscalls/Handlers/SysExit.h"
 #include "Core/Tasking/Scheduler/SchedulerTick.h"
-#include "ApexLib/Logs/Log.h"
+#include "Logs/Log.h"
 
 // ── Return to the shell after a user process (SYS_EXIT) ──────────────────
 // No real process_exit()/scheduler handoff back to the calling process

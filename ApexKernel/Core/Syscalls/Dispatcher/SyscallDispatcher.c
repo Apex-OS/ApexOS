@@ -8,7 +8,7 @@
 #include "Core/Syscalls/Handlers/SysGetPID.h"
 #include "Core/Syscalls/Handlers/SysSleep.h"
 #include "Core/Syscalls/Handlers/SysDriverCall.h"
-#include "ApexLib/Logs/Log.h"
+#include "Logs/Log.h"
 
 uint64_t syscall_handler(uint64_t num, uint64_t arg1,
                          uint64_t arg2, uint64_t arg3)

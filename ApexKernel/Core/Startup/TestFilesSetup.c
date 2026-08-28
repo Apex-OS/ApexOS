@@ -9,7 +9,7 @@
 #include "Formats/AXF/Embed/TestImportAXP.h"
 #include "Formats/AXF/Embed/StubAXD.h"
 #include "Formats/AXF/Embed/TestDriverAXP.h"
-#include "ApexLib/Logs/Log.h"
+#include "Logs/Log.h"
 
 void core_seed_test_files(axfs_volume_t *vol)
 {

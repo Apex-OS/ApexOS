@@ -4,6 +4,8 @@
 #ifndef APEX_FORMATS_AXF_AXP_IMPORT_RESOLUTION_H
 #define APEX_FORMATS_AXF_AXP_IMPORT_RESOLUTION_H
 
+#include "Core/Types.h"
+
 #include "Formats/AXF/AXFFormat.h"
 #include "Filesystem/AXFS/AXFS.h"
 

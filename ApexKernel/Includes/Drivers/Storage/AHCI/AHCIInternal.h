@@ -10,6 +10,8 @@
 #ifndef APEX_DRIVERS_STORAGE_AHCI_INTERNAL_H
 #define APEX_DRIVERS_STORAGE_AHCI_INTERNAL_H
 
+#include "Core/Types.h"
+
 #include "Drivers/Storage/AHCI/AHCI.h"
 
 extern hba_mem_t *g_hba;

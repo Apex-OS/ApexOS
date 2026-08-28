@@ -4,7 +4,7 @@
 #include "Filesystem/AXFS/AXFS.h"
 #include "Filesystem/AXFS/Tree/DefaultTreeData.h"
 #include "Drivers/Display/VGA.h"
-#include "ApexLib/Logs/Log.h"
+#include "Logs/Log.h"
 
 bool axfs_create_default_tree(axfs_volume_t *vol)
 {

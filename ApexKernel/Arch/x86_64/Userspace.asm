@@ -3,6 +3,8 @@
 
 [BITS 64]
 global userspace_jump
+global user_main_start
+global user_main_end
 
 ; userspace_jump(uint64_t entry, uint64_t stack)
 ; RDI = entry, RSI = stack
@@ -23,3 +25,11 @@ userspace_jump:
     push rdi            ; RIP = entry userspace
 
     iretq
+
+; Minimal position-independent Ring 3 smoke test used by `ring3`.
+; RAX = syscall number, so zero selects SYS_EXIT.
+user_main_start:
+    mov eax, 0
+    syscall
+    hlt
+user_main_end:

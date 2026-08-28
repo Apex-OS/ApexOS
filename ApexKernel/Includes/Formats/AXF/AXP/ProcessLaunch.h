@@ -4,6 +4,8 @@
 #ifndef APEX_FORMATS_AXF_AXP_PROCESS_LAUNCH_H
 #define APEX_FORMATS_AXF_AXP_PROCESS_LAUNCH_H
 
+#include "Core/Types.h"
+
 #include "Filesystem/AXFS/AXFS.h"
 
 // Loads a .axp from `vol` (inode `inode_num`), resolves any imports

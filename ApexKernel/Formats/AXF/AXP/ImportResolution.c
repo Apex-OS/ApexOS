@@ -5,7 +5,7 @@
 #include "Formats/AXF/AXL/LibraryLoader.h"
 #include "Core/Memory/Physical/PageBitmap.h"
 #include "Core/Memory/Virtual/PageTables.h"
-#include "ApexLib/Logs/Log.h"
+#include "Logs/Log.h"
 
 bool axp_resolve_imports(axfs_volume_t *vol, uint64_t dir_inode, const axf_header_t *header,
                          const uint8_t *filebuf, uint64_t read_bytes)

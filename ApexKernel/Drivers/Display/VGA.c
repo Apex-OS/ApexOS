@@ -4,6 +4,7 @@
 #include "Drivers/Display/VGA.h"
 #include "Bus/PortIO.h"
 #include "Bus/Serial/Serial.h"
+#include "Devices/Serial/16550/Serial16550.h"
 #include "Drivers/Display/Console/ConsoleCore.h"
 #include "Drivers/Display/Console/ConsoleCursor.h"
 #include "Drivers/Display/Console/ConsoleScrollback.h"

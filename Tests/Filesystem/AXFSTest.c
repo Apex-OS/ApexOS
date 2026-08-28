@@ -2,7 +2,7 @@
 // ApexOS -- AXFS self-test
 
 #include "AXFSTest.h"
-#include "Tests/Kernel/TestRunner.h"
+#include "../Kernel/TestRunner.h"
 #include "Drivers/Display/VGA.h"
 #include "Filesystem/VFS/FilesystemRouter.h"
 #include "Filesystem/AXFS/AXFS.h"

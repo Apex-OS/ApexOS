@@ -9,8 +9,7 @@
 #include "Core/Syscalls/Handlers/SysExit.h"
 #include "Core/Memory/Physical/PageBitmap.h"
 #include "Core/Memory/Virtual/PageTables.h"
-#include "Arch/x86_64/Userspace.h"
-#include "ApexLib/Logs/Log.h"
+#include "Logs/Log.h"
 
 // Return point shared with `ring3` (see
 // Core/Syscalls/Handlers/SysExit.c). 0 = first pass (haven't jumped

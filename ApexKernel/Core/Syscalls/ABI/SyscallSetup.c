@@ -2,7 +2,7 @@
 // ApexOS -- Syscall MSR configuration (syscall/sysret enablement)
 
 #include "Core/Syscalls/ABI/SyscallSetup.h"
-#include "ApexLib/Logs/Log.h"
+#include "Logs/Log.h"
 
 #define MSR_EFER 0xC0000080
 #define MSR_STAR 0xC0000081

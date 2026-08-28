@@ -20,6 +20,7 @@
 
 #include "Core/Types.h"
 #include "Filesystem/AXFS/AXFS.h"
+#include "Formats/AXF/AXFFormat.h"
 
 #define AXD_MAX_DRIVERS 32
 #define AXD_MAX_NAME 32

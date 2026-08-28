@@ -10,7 +10,7 @@
 #include "HeapTest.h"
 #include "SchedulerTest.h"
 #include "Drivers/Display/VGA.h"
-#include "ApexLib/Logs/Log.h"
+#include "Logs/Log.h"
 
 // Tests/Filesystem/'s test_axfs/test_axfs_cleanup/test_vfs -- declared
 // here rather than included via a header path across directories,

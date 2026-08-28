@@ -8,6 +8,8 @@
 #ifndef APEX_FILESYSTEM_VFS_INTERNAL_H
 #define APEX_FILESYSTEM_VFS_INTERNAL_H
 
+#include "Core/Types.h"
+
 #include "Filesystem/VFS/VolumeRegistry.h"
 
 typedef struct

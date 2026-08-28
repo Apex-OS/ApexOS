@@ -5,7 +5,7 @@
 #include "Core/Userspace.h"
 #include "Core/Memory/Physical/PageBitmap.h"
 #include "Core/Memory/Virtual/PageTables.h"
-#include "ApexLib/Logs/Log.h"
+#include "Logs/Log.h"
 
 bool axp_load_sections(const axf_header_t *header, const uint8_t *filebuf,
                        uint64_t read_bytes, bool *entry_point_valid)

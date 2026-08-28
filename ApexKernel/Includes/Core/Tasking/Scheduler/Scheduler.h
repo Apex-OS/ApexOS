@@ -4,6 +4,8 @@
 #ifndef APEX_CORE_TASKING_SCHEDULER_H
 #define APEX_CORE_TASKING_SCHEDULER_H
 
+#include "Core/Types.h"
+
 #include "Core/Tasking/Process/Process.h"
 
 void scheduler_init(void);

@@ -3,7 +3,7 @@
 
 #include "Filesystem/AXFS/AXFS.h"
 #include "Drivers/Display/VGA.h"
-#include "ApexLib/Logs/Log.h"
+#include "Logs/Log.h"
 
 bool axfs_mount(axfs_volume_t *vol)
 {

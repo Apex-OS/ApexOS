@@ -3,7 +3,7 @@
 
 #include "Core/Tasking/Context/TSS.h"
 #include "Arch/x86_64/GDTExtension.h"
-#include "ApexLib/Logs/Log.h"
+#include "Logs/Log.h"
 
 static tss_t tss;
 

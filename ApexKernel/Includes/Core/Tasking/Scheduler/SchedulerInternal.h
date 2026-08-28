@@ -8,6 +8,8 @@
 #ifndef APEX_CORE_TASKING_SCHEDULER_INTERNAL_H
 #define APEX_CORE_TASKING_SCHEDULER_INTERNAL_H
 
+#include "Core/Types.h"
+
 #include "Core/Tasking/Scheduler/Scheduler.h"
 
 extern process_t *proc_list;

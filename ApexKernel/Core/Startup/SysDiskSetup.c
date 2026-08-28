@@ -5,7 +5,7 @@
 #include "Core/Panic.h"
 #include "Drivers/Storage/AHCI/AHCI.h"
 #include "Filesystem/VFS/VolumeRegistry.h"
-#include "ApexLib/Logs/Log.h"
+#include "Logs/Log.h"
 
 axfs_volume_t *core_setup_sysdisk(void)
 {

@@ -4,6 +4,8 @@
 #ifndef APEX_FILESYSTEM_VFS_FILESYSTEM_ROUTER_H
 #define APEX_FILESYSTEM_VFS_FILESYSTEM_ROUTER_H
 
+#include "Core/Types.h"
+
 #include "Filesystem/AXFS/AXFS.h"
 
 // Resolves a full ABSOLUTE path ("/@SysDisk/Home/...") and returns

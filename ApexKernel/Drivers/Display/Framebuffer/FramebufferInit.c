@@ -6,7 +6,7 @@
 #include "Core/Memory/Virtual/PageTables.h"
 #include "Core/Memory/Physical/PageBitmap.h"
 #include "Core/Memory/Heap/Heap.h"
-#include "ApexLib/Logs/Log.h"
+#include "Logs/Log.h"
 
 bool fb_init(void)
 {

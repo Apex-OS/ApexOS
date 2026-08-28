@@ -4,6 +4,8 @@
 #ifndef APEX_FILESYSTEM_AXFS_INODE_CREATION_H
 #define APEX_FILESYSTEM_AXFS_INODE_CREATION_H
 
+#include "Core/Types.h"
+
 #include "Filesystem/AXFS/AXFS.h"
 
 // Allocates a new inode number and builds the inode's initial content

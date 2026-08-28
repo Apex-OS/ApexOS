@@ -9,6 +9,8 @@
 #ifndef APEX_FILESYSTEM_AXFS_ALLOCATION_INTERNAL_H
 #define APEX_FILESYSTEM_AXFS_ALLOCATION_INTERNAL_H
 
+#include "Core/Types.h"
+
 #include "Filesystem/AXFS/Internal.h"
 
 bool bitmap_test_bit(axfs_volume_t *vol, uint64_t bitmap_start_block, uint64_t bit_index);

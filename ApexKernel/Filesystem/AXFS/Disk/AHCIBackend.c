@@ -5,7 +5,7 @@
 #include "Filesystem/AXFS/AXFS.h"
 #include "Drivers/Storage/AHCI/AHCI.h"
 #include "Drivers/Display/VGA.h"
-#include "ApexLib/Logs/Log.h"
+#include "Logs/Log.h"
 
 // 512-byte sectors per AXFS block -- fixed by AXFS_BLOCK_SIZE (4096)
 // vs the disk's fixed 512-byte sector size, not configurable per

@@ -6,7 +6,6 @@
 #include "Core/Memory/Physical/PageBitmap.h"
 #include "Core/Memory/Virtual/PageTables.h"
 #include "Core/Syscalls/Handlers/SysExit.h"
-#include "Arch/x86_64/Userspace.h"
 #include "Drivers/Display/VGA.h"
 
 // Defined in SysExit.c, set by the naked syscall_set_shell_return_point()

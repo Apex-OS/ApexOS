@@ -8,6 +8,7 @@
 #include "Drivers/Display/Console/ConsoleCursor.h"
 #include "Drivers/Display/Framebuffer/Framebuffer.h"
 #include "Bus/Serial/Serial.h"
+#include "Devices/Serial/16550/Serial16550.h"
 
 fbcon_cell_t scrollback[FBCON_SCROLLBACK_LINES][FBCON_MAX_WIDTH];
 uint32_t total_lines = 1;

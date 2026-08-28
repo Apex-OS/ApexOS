@@ -9,6 +9,8 @@
 #ifndef APEX_CORE_MEMORY_HEAP_INTERNAL_H
 #define APEX_CORE_MEMORY_HEAP_INTERNAL_H
 
+#include "Core/Types.h"
+
 #include "Core/Memory/Heap/Heap.h"
 
 extern heap_block_t *heap_head;

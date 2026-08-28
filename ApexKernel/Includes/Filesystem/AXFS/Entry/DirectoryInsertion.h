@@ -4,6 +4,8 @@
 #ifndef APEX_FILESYSTEM_AXFS_DIRECTORY_INSERTION_H
 #define APEX_FILESYSTEM_AXFS_DIRECTORY_INSERTION_H
 
+#include "Core/Types.h"
+
 #include "Filesystem/AXFS/AXFS.h"
 
 // Inserts a new directory entry (name -> inode_num, type) into

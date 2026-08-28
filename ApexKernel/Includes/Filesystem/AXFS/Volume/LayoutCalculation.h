@@ -4,6 +4,8 @@
 #ifndef APEX_FILESYSTEM_AXFS_LAYOUT_CALCULATION_H
 #define APEX_FILESYSTEM_AXFS_LAYOUT_CALCULATION_H
 
+#include "Core/Types.h"
+
 #include "Filesystem/AXFS/AXFS.h"
 
 // Computed on-disk zone boundaries for a fresh volume of a given

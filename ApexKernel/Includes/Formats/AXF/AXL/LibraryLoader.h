@@ -4,6 +4,8 @@
 #ifndef APEX_FORMATS_AXF_AXL_LIBRARY_LOADER_H
 #define APEX_FORMATS_AXF_AXL_LIBRARY_LOADER_H
 
+#include "Core/Types.h"
+
 #include "Filesystem/AXFS/AXFS.h"
 
 // Loads a .axl (looked up by name in `dir_inode`), maps it at

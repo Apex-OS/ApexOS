@@ -4,6 +4,8 @@
 #ifndef APEX_FORMATS_AXF_AXD_EXPORT_RESOLUTION_H
 #define APEX_FORMATS_AXF_AXD_EXPORT_RESOLUTION_H
 
+#include "Core/Types.h"
+
 #include "Formats/AXF/AXD/HeaderValidation.h"
 #include "Formats/AXF/AXFFormat.h"
 

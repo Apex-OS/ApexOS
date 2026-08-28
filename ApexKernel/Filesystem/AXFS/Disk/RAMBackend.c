@@ -5,7 +5,7 @@
 #include "Filesystem/AXFS/AXFS.h"
 #include "Core/Memory/Heap/Heap.h"
 #include "Drivers/Display/VGA.h"
-#include "ApexLib/Logs/Log.h"
+#include "Logs/Log.h"
 
 bool axfs_disk_init_ram(axfs_disk_t *disk, uint64_t size_bytes)
 {

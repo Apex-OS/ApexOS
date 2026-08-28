@@ -9,7 +9,7 @@
 #include "Core/Shell/Commands/DiagnosticCommands.h"
 #include "Core/Shell/Commands/UserspaceTest.h"
 #include "Drivers/Display/VGA.h"
-#include "ApexLib/Logs/Log.h"
+#include "Logs/Log.h"
 
 // Tests/ has no Includes/ (test files are self-contained, see project
 // notes) -- declared directly here instead.

@@ -11,6 +11,8 @@
 #ifndef APEX_CORE_SHELL_INTERNAL_H
 #define APEX_CORE_SHELL_INTERNAL_H
 
+#include "Core/Types.h"
+
 #include "Core/Shell/Shell.h"
 
 extern char cmd_buf[SHELL_BUFFER_SIZE];

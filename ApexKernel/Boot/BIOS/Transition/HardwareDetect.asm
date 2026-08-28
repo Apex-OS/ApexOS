@@ -3,21 +3,6 @@
 
 [BITS 16]
 
-extern print16
-
-global detect_memory
-global detect_vbe_mode
-
-MMAP_ADDR           equ 0x9600
-MMAP_COUNT          equ 0x95FC
-
-VBE_INFO_ADDR       equ 0x9000
-VBE_MODE_INFO_ADDR  equ 0x9200
-VBE_RESULT_ADDR     equ 0x9300
-
-MAX_FB_WIDTH        equ 1600
-MAX_FB_HEIGHT       equ 900
-
 detect_memory:
     mov ax, 0x0000
     mov es, ax

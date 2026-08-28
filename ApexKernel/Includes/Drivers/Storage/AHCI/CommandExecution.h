@@ -4,6 +4,8 @@
 #ifndef APEX_DRIVERS_STORAGE_AHCI_COMMAND_EXECUTION_H
 #define APEX_DRIVERS_STORAGE_AHCI_COMMAND_EXECUTION_H
 
+#include "Core/Types.h"
+
 #include "Drivers/Storage/AHCI/AHCI.h"
 
 // Finds a free command slot (one whose bit is clear in both PxCI and

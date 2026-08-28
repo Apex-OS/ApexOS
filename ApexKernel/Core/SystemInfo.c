@@ -3,7 +3,7 @@
 
 #include "Core/SystemInfo.h"
 #include "Drivers/Display/VGA.h"
-#include "ApexLib/Logs/Log.h"
+#include "Logs/Log.h"
 
 void print_sysinfo(void)
 {

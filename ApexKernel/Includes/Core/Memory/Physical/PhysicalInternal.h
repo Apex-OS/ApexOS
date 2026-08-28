@@ -11,6 +11,8 @@
 #ifndef APEX_CORE_MEMORY_PHYSICAL_INTERNAL_H
 #define APEX_CORE_MEMORY_PHYSICAL_INTERNAL_H
 
+#include "Core/Types.h"
+
 #include "Core/Memory/Physical/PageBitmap.h"
 
 extern uint8_t *pmm_bitmap;

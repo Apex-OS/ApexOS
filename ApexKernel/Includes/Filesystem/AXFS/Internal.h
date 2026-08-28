@@ -14,6 +14,8 @@
 #ifndef APEX_FILESYSTEM_AXFS_INTERNAL_H
 #define APEX_FILESYSTEM_AXFS_INTERNAL_H
 
+#include "Core/Types.h"
+
 #include "Filesystem/AXFS/AXFS.h"
 #include "Filesystem/AXFS/Disk/DiskRouter.h"
 

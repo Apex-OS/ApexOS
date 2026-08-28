@@ -4,7 +4,7 @@
 #include "Core/Memory/Heap/HeapStats.h"
 #include "Core/Memory/Heap/HeapInternal.h"
 #include "Drivers/Display/VGA.h"
-#include "ApexLib/Logs/Log.h"
+#include "Logs/Log.h"
 
 void heap_print_stats(void)
 {

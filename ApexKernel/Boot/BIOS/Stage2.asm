@@ -92,8 +92,6 @@ PD_ADDR             equ 0x3000
 PT_ADDR             equ 0x4000
 
 ; ── Entry point ──────────────────────────────────────────────────────────────
-
-; ── Entry point ──────────────────────────────────────────────────────────────
 stage2_start:
     cli
     xor ax, ax
@@ -114,19 +112,6 @@ stage2_start:
     call detect_vbe_mode
     jmp enter_protected_mode
 
-; ── Enable A20 ───────────────────────────────────────────────────────────────
-
-extern enable_a20
-extern load_kernel_low
-extern detect_memory
-extern detect_vbe_mode
-extern enter_protected_mode
-
-global print16
-global dap, dap_count, dap_buffer_off, dap_buffer_seg, dap_lba_lo, dap_lba_hi
-global remaining_sectors, boot_drive
-global msg_stage2, msg_loading, msg_loaded, msg_disk_err
-
 print16:
     mov ah, 0x0E
 .loop:
@@ -139,21 +124,17 @@ print16:
     ret
 
 ; ── DAP ──────────────────────────────────────────────────────────────────────
-; DAP fields are named individually so load_kernel_low's chunk loop
-; can update count/segment/LBA between reads (see dap_count,
-; dap_buffer_seg, dap_lba_lo/dap_lba_hi below -- same memory, just
-; labeled per-field instead of one opaque block).
 dap:
     db 0x10
     db 0
 dap_count:
-    dw KERNEL_SECTORS ; overwritten per-chunk by load_kernel_low
+    dw KERNEL_SECTORS
 dap_buffer_off:
     dw KERNEL_TMP_OFF
 dap_buffer_seg:
-    dw KERNEL_TMP_SEG ; overwritten per-chunk by load_kernel_low
+    dw KERNEL_TMP_SEG
 dap_lba_lo:
-    dd KERNEL_LBA      ; overwritten per-chunk by load_kernel_low
+    dd KERNEL_LBA
 dap_lba_hi:
     dd 0
 
@@ -166,5 +147,7 @@ msg_loading     db "Loading kernel...", 0x0D, 0x0A, 0
 msg_loaded      db "Kernel loaded OK!", 0x0D, 0x0A, 0
 msg_disk_err    db "Disk read error!", 0x0D, 0x0A, 0
 
-; ── Passage en mode protégé ───────────────────────────────────────────────────
-
+; ── Included stage2 files ─────────────────────────────────────────────────
+%include "Transition/KernelLoader.asm"
+%include "Transition/HardwareDetect.asm"
+%include "Transition/LongModeEntry.asm"

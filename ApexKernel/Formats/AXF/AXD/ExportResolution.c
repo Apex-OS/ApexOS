@@ -2,7 +2,7 @@
 // ApexOS -- AXD export table resolution (internal to axd_load)
 
 #include "Formats/AXF/AXD/ExportResolution.h"
-#include "ApexLib/Logs/Log.h"
+#include "Logs/Log.h"
 
 static bool str_eq(const char *a, const char *b)
 {

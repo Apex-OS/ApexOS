@@ -11,7 +11,7 @@
 #include "Filesystem/AXFS/Entry/Unlink.h"
 #include "Formats/AXF/AXP/ProcessLaunch.h"
 #include "Drivers/Display/VGA.h"
-#include "ApexLib/Logs/Log.h"
+#include "Logs/Log.h"
 
 void cmd_ls(const char *arg)
 {

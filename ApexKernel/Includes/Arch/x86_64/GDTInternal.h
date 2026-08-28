@@ -7,6 +7,8 @@
 #ifndef APEX_ARCH_X86_64_GDT_INTERNAL_H
 #define APEX_ARCH_X86_64_GDT_INTERNAL_H
 
+#include "Core/Types.h"
+
 #include "Arch/x86_64/GDTSetup.h"
 
 // Extended GDT -- 7 entries (5 normal + 2 for the TSS).

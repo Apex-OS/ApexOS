@@ -4,7 +4,7 @@
 #include "Filesystem/VFS/VolumeRegistry.h"
 #include "Filesystem/VFS/VFSInternal.h"
 #include "Drivers/Display/VGA.h"
-#include "ApexLib/Logs/Log.h"
+#include "Logs/Log.h"
 
 vfs_volume_t g_volumes[VFS_MAX_VOLUMES];
 

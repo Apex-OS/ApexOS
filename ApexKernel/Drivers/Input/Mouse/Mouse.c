@@ -6,7 +6,7 @@
 #include "Drivers/Input/Mouse/PS2Port.h"
 #include "Drivers/Display/VGA.h"
 #include "Bus/PortIO.h"
-#include "ApexLib/Logs/Log.h"
+#include "Logs/Log.h"
 
 static uint8_t packet[4];
 static uint8_t packet_index = 0;

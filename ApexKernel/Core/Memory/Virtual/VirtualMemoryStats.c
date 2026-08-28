@@ -3,7 +3,7 @@
 
 #include "Core/Memory/Virtual/VirtualMemoryStats.h"
 #include "Drivers/Display/VGA.h"
-#include "ApexLib/Logs/Log.h"
+#include "Logs/Log.h"
 
 void vmm_print_stats(void)
 {

@@ -4,6 +4,8 @@
 #ifndef APEX_DRIVERS_STORAGE_AHCI_PORT_CONTROL_H
 #define APEX_DRIVERS_STORAGE_AHCI_PORT_CONTROL_H
 
+#include "Core/Types.h"
+
 #include "Drivers/Storage/AHCI/AHCI.h"
 
 // Spins until `cond` becomes false or `timeout_ms` elapses. Returns

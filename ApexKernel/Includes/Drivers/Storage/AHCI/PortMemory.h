@@ -4,6 +4,8 @@
 #ifndef APEX_DRIVERS_STORAGE_AHCI_PORT_MEMORY_H
 #define APEX_DRIVERS_STORAGE_AHCI_PORT_MEMORY_H
 
+#include "Core/Types.h"
+
 #include "Drivers/Storage/AHCI/AHCI.h"
 
 // Allocates and wires up the command list, received-FIS area, and per-

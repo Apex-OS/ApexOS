@@ -26,6 +26,7 @@
 
 #include "Core/Types.h"
 #include "Drivers/Display/VGA.h" // vga_color_t -- reused so callers' color arguments need no translation
+#include "Drivers/Display/Fonts/Font8x16.h"
 
 // One console cell -- character plus color attribute.
 typedef struct

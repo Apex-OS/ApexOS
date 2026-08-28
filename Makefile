@@ -228,7 +228,7 @@ $(BUILD)/stage1.bin: $(BOOT_DIR)/Stage1.asm
 $(BUILD)/stage2.bin: $(BOOT_DIR)/Stage2.asm $(BOOT_DIR)/Transition/KernelLoader.asm $(BOOT_DIR)/Transition/HardwareDetect.asm $(BOOT_DIR)/Transition/LongModeEntry.asm
 	@mkdir -p $(BUILD)
 	@echo "  ASM     stage2.bin"
-	@$(ASM) $(ASMFLAGS) $< -o $@
+	@$(ASM) $(ASMFLAGS) -I$(BOOT_DIR)/ $< -o $@
 
 # ── Disk image creation ─────────────────────────────────────────────────────
 $(BUILD)/apex.img: $(BUILD)/stage1.bin $(BUILD)/stage2.bin $(BUILD)/kernel.bin

@@ -4,6 +4,8 @@
 #ifndef APEX_FORMATS_AXF_AXP_HEADER_VALIDATION_H
 #define APEX_FORMATS_AXF_AXP_HEADER_VALIDATION_H
 
+#include "Core/Types.h"
+
 #include "Formats/AXF/AXFFormat.h"
 
 // Validates the AXF header read for a .axp: magic, version, type ==

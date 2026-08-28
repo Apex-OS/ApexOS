@@ -10,6 +10,8 @@
 #ifndef APEX_DRIVERS_DISPLAY_CONSOLE_INTERNAL_H
 #define APEX_DRIVERS_DISPLAY_CONSOLE_INTERNAL_H
 
+#include "Core/Types.h"
+
 #include "Drivers/Display/Console/ConsoleCore.h"
 
 extern fbcon_cell_t scrollback[FBCON_SCROLLBACK_LINES][FBCON_MAX_WIDTH];

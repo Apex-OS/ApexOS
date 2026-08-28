@@ -4,7 +4,7 @@
 #include "Core/Memory/Physical/PhysicalMemoryStats.h"
 #include "Core/Memory/Physical/PageBitmap.h"
 #include "Drivers/Display/VGA.h"
-#include "ApexLib/Logs/Log.h"
+#include "Logs/Log.h"
 
 void pmm_print_stats(void)
 {

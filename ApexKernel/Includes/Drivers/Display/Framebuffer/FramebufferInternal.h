@@ -8,6 +8,8 @@
 #ifndef APEX_DRIVERS_DISPLAY_FRAMEBUFFER_INTERNAL_H
 #define APEX_DRIVERS_DISPLAY_FRAMEBUFFER_INTERNAL_H
 
+#include "Core/Types.h"
+
 #include "Drivers/Display/Framebuffer/Framebuffer.h"
 
 extern fb_info_t g_fb;

@@ -13,6 +13,7 @@
 #include "Core/Shell/History.h"
 #include "Drivers/Display/VGA.h"
 #include "Drivers/Input/Keyboard/Keyboard.h"
+#include "Drivers/Input/Keyboard/KeyBuffer.h"
 
 char cmd_buf[SHELL_BUFFER_SIZE];
 uint32_t cmd_len = 0;

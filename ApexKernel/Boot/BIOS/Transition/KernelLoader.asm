@@ -3,18 +3,6 @@
 
 [BITS 16]
 
-extern print16
-extern dap, dap_count, dap_buffer_off, dap_buffer_seg, dap_lba_lo, dap_lba_hi
-extern remaining_sectors, boot_drive
-extern msg_loading, msg_loaded, msg_disk_err
-
-global enable_a20
-global load_kernel_low
-
-KERNEL_TMP_SEG      equ 0x1000
-KERNEL_SECTORS      equ 200
-KERNEL_LBA          equ 34
-
 enable_a20:
     in al, 0x92
     or al, 2

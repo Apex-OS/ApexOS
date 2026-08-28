@@ -6,7 +6,7 @@
 #include "Formats/AXF/AXFFormat.h"
 #include "Core/Memory/Physical/PageBitmap.h"
 #include "Core/Memory/Virtual/PageTables.h"
-#include "ApexLib/Logs/Log.h"
+#include "Logs/Log.h"
 
 axd_driver_t loaded_drivers[AXD_MAX_DRIVERS];
 int axd_driver_count = 0;
