@@ -87,5 +87,10 @@ void vga_write_at(uint8_t row, uint8_t col, char c);
 // Scrollback: scrolls back/forward `lines` lines through history.
 void vga_scroll_up(uint32_t lines);
 void vga_scroll_down(uint32_t lines);
+// True if the view is currently scrolled up into history (not showing
+// the live/bottom of the buffer).
+bool vga_is_scrolled(void);
+void vga_begin_batch(void);
+void vga_end_batch(void);
 
 #endif // APEX_DRIVERS_DISPLAY_VGA_H

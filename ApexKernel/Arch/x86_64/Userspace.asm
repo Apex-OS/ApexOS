@@ -29,7 +29,11 @@ userspace_jump:
 ; Minimal position-independent Ring 3 smoke test used by `ring3`.
 ; RAX = syscall number, so zero selects SYS_EXIT.
 user_main_start:
-    mov eax, 0
+    mov eax, 0          ; RAX = SYS_EXIT
+    xor edi, edi        ; RDI = exit code = 0 (was left holding
+                         ; USER_CODE_ADDR from userspace_jump's RDI=entry
+                         ; argument, never overwritten before this syscall --
+                         ; that's what showed up as "exit: 4194304" = 0x400000)
     syscall
     hlt
 user_main_end:

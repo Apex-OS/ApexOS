@@ -78,6 +78,11 @@ void fbcon_write_at(uint8_t row, uint8_t col, char c);
 // against the real grid when in graphics mode, if ever needed.
 uint32_t fbcon_get_width(void);
 uint32_t fbcon_get_height(void);
+// Current scrollback offset -- 0 means showing the live/bottom of the
+// buffer, non-zero means scrolled up into history.
+uint32_t fbcon_get_scroll_offset(void);
+void fbcon_begin_batch(void);
+void fbcon_end_batch(void);
 
 static inline uint8_t fbcon_make_attr(vga_color_t fg, vga_color_t bg)
 {

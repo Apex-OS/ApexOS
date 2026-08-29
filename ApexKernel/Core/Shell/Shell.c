@@ -52,6 +52,10 @@ void shell_run(void)
         if (!keyboard_has_key())
             continue;
 
+        // Any keypress jumps back to the live prompt if scrolled up.
+        if (vga_is_scrolled())
+            vga_scroll_down(0xFFFFFFFF);
+
         uint8_t c = keyboard_getchar();
         if (c == 0)
             continue;
@@ -62,7 +66,9 @@ void shell_run(void)
             vga_set_cursor_pos(prompt_row, shell_prompt_len + cmd_len);
             vga_putchar('\n');
             shell_history_push(cmd_buf);
+            vga_begin_batch();
             shell_execute();
+            vga_end_batch();
             shell_print_prompt();
         }
         else if (c == '\b')

@@ -167,8 +167,8 @@ void mouse_handler(void)
         // the wheel matters here.
         int8_t wheel_delta = (int8_t)packet[3];
         if (wheel_delta > 0)
-            vga_scroll_down((uint32_t)wheel_delta);
+            vga_scroll_down((uint32_t)wheel_delta * 2);
         else if (wheel_delta < 0)
-            vga_scroll_up((uint32_t)(-wheel_delta));
+            vga_scroll_up((uint32_t)(-wheel_delta) * 2);
     }
 }

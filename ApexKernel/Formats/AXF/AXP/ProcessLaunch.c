@@ -10,6 +10,7 @@
 #include "Core/Memory/Physical/PageBitmap.h"
 #include "Core/Memory/Virtual/PageTables.h"
 #include "Logs/Log.h"
+#include "Core/Interrupts/PIC/PICControl.h"
 
 // Return point shared with `ring3` (see
 // Core/Syscalls/Handlers/SysExit.c). 0 = first pass (haven't jumped
@@ -72,9 +73,19 @@ bool axf_load_and_run(axfs_volume_t *vol, uint64_t inode_num, uint64_t dir_inode
 
     if (shell_return_bypass == 0)
     {
+        // IRQ0 is masked while Ring 3 code runs and re-enabled right
+        // after: an IRQ0 landing during Ring3 execution (or during the
+        // fbcon_present() full-grid redraw, see ConsoleRender.c) could
+        // leave the kernel in a state that faulted with #GP on a later
+        // iretq. Masking IRQ0 for the whole Ring3 window closes that off.
+        pic_mask_irq(0);
+
         // First pass: actually jump.
         userspace_jump(header.entry_point, stack_top);
     }
+
+    // Re-enable IRQ0 now that we're back in the kernel.
+    pic_unmask_irq(0);
 
     // Reached only after the loaded program's SYS_EXIT
     // (shell_return_bypass == 1 at this point).

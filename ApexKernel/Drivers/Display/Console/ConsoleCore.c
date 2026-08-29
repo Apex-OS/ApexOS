@@ -21,6 +21,7 @@ uint8_t cur_col = 0;
 uint32_t cur_row = 0; // on-screen write row (0..grid_height-1)
 uint8_t cur_attr = 0;
 bool cursor_hidden = false;
+bool present_suppressed = false;
 
 const uint32_t vga_palette[16] = {
     FB_RGB(0, 0, 0),       // VGA_BLACK
@@ -45,6 +46,29 @@ uint32_t fbcon_get_width(void) { return grid_width; }
 uint32_t fbcon_get_height(void) { return grid_height; }
 uint8_t fbcon_get_row(void) { return (uint8_t)cur_row; }
 uint8_t fbcon_get_col(void) { return cur_col; }
+uint32_t fbcon_get_scroll_offset(void) { return scroll_offset; }
+// See fbcon_begin_batch()/fbcon_end_batch() below.
+static uint32_t batch_start_total_lines = 0;
+
+void fbcon_begin_batch(void)
+{
+    present_suppressed = true;
+    batch_start_total_lines = total_lines;
+}
+
+void fbcon_end_batch(void)
+{
+    present_suppressed = false;
+
+    // Only forces the full-grid redraw if the batch actually scrolled
+    // (total_lines grew past what it was, and enough to have crossed
+    // grid_height at some point) -- individual characters/lines were
+    // already drawn incrementally via fbcon_draw_cell_present() while
+    // suppressed (that path isn't gated by present_suppressed), so a
+    // short command that never scrolled needs no extra redraw here.
+    if (total_lines != batch_start_total_lines && total_lines >= grid_height)
+        fbcon_present();
+}
 
 void fbcon_init(void)
 {
@@ -78,7 +102,7 @@ void fbcon_clear(void)
     cur_col = 0;
     cur_row = 0;
     fb_clear(vga_palette[VGA_BLACK]);
-    fbcon_present();
+    fbcon_present_force();
 }
 
 void fbcon_set_color(vga_color_t fg, vga_color_t bg)

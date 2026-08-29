@@ -262,6 +262,7 @@ run: all
 run-emergency: all
 	@echo "  QEMU    Launching ApexOS (Fallback Test)..."
 	@qemu-system-x86_64              \
+        -M q35                       \
 		-drive file=$(BUILD)/apex.img,format=raw,index=0,media=disk \
 		-m 256M                      \
 		-serial stdio                \

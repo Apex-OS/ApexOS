@@ -134,6 +134,12 @@ uint64_t sys_exit(uint64_t arg1)
         shell_return_jump();
     }
 
+    // DIAGNOSTIC -- si ce log apparait jamais, shell_return_point_set
+    // etait faux au moment ou sys_exit a tourne (donc `ring3`/`run` n'a
+    // jamais appele syscall_set_shell_return_point()/
+    // syscall_mark_shell_return_point_ready() avant de lancer le
+    // programme -- chercher un chemin de code qui saute cette etape).
+    klog_error("sys_exit: shell_return_point_set was FALSE -- halting forever");
     __asm__ volatile("cli; hlt");
     return 0;
 }

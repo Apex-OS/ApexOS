@@ -25,6 +25,7 @@ extern uint8_t cur_col;
 extern uint32_t cur_row; // on-screen write row (0..grid_height-1)
 extern uint8_t cur_attr;
 extern bool cursor_hidden;
+extern bool present_suppressed;
 
 // 16-color VGA palette, standard RGB values (same as most VGA text
 // mode implementations/terminal emulators default to) -- used to

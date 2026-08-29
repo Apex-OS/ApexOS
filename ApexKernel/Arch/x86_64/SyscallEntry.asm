@@ -79,7 +79,16 @@ syscall_entry:
     mov qword [rel in_syscall], 0
 
     mov rsp, r10
-    sti
+    ; PAS de sti explicite ici -- o64 sysret restaure RFLAGS (donc IF)
+    ; depuis R11 automatiquement au moment precis du retour en Ring 3.
+    ; Un sti explicite AVANT sysret ouvrait une fenetre de 1-2
+    ; instructions ou les interruptions etaient deja actives alors
+    ; qu'on etait encore en Ring 0 avec RSP=pile utilisateur mais pas
+    ; encore reellement reparti en Ring 3 -- si IRQ0 se declenchait
+    ; pile dans cette fenetre, scheduler_tick_asm() voyait deja
+    ; in_syscall=0 (mis a 0 juste avant, ligne ci-dessus) et pouvait
+    ; tenter un vrai changement de contexte sur un etat CPU
+    ; incoherent (freeze aleatoire observe sur `ring3`/`run *.axp`).
     o64 sysret
 
 section .bss

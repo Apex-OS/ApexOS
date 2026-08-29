@@ -393,3 +393,25 @@ void vga_scroll_down(uint32_t lines)
         scroll_offset -= lines;
     vga_present();
 }
+
+bool vga_is_scrolled(void)
+{
+    if (graphics_mode)
+        return fbcon_get_scroll_offset() != 0;
+    return scroll_offset != 0;
+}
+
+static uint32_t text_batch_start_total_lines = 0;
+
+void vga_begin_batch(void)
+{
+    if (graphics_mode)
+        fbcon_begin_batch();
+    text_batch_start_total_lines = total_lines;
+}
+
+void vga_end_batch(void)
+{
+    if (graphics_mode)
+        fbcon_end_batch();
+}

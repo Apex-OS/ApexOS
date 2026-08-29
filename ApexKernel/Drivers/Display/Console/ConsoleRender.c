@@ -29,6 +29,15 @@ void fbcon_draw_cell_present(uint32_t row, uint32_t col, char c, uint8_t attr)
 
 void fbcon_present(void)
 {
+    if (present_suppressed)
+        return;
+    fbcon_present_force();
+}
+
+void fbcon_present_force(void)
+{
+    __asm__ volatile("cli");
+
     uint32_t first = 0;
     if (total_lines > grid_height)
         first = total_lines - grid_height;
@@ -55,4 +64,6 @@ void fbcon_present(void)
 
     fbcon_draw_cursor();
     fb_present();
+
+    __asm__ volatile("sti");
 }

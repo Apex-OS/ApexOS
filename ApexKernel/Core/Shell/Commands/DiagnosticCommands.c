@@ -4,6 +4,7 @@
 #include "Core/Shell/Commands/DiagnosticCommands.h"
 #include "Drivers/Display/Framebuffer/Framebuffer.h"
 #include "Drivers/Display/Console/ConsoleCore.h"
+#include "Drivers/Display/Console/ConsoleRender.h"
 #include "Drivers/Display/Drawing/Shapes.h"
 #include "Drivers/Display/Drawing/Text.h"
 #include "Drivers/Display/Drawing/Cursor.h"
@@ -109,15 +110,25 @@ void cmd_gfxtest(void)
     }
     keyboard_getchar(); // consumes the keypress that ended the loop
 
-    // Clears the framebuffer console back to a blank screen before
-    // returning to the shell -- with fbcon_putchar() now only
-    // presenting the cell it actually touches (see fb_present_rect()
-    // in Framebuffer.c), nothing else repaints the rest of the screen
-    // automatically the way the old full-screen fb_present() used to.
-    // Without this, the shell's next prompt would just get drawn on
-    // top of gfxtest's last frame instead of a clean background.
+    // Redraws the shell's last on-screen state from the untouched
+    // scrollback buffer before returning -- gfxtest draws straight to
+    // the framebuffer without ever touching the console's scrollback,
+    // so this restores exactly what was there before gfxtest ran
+    // instead of wiping the whole history (fbcon_clear() would do
+    // that). Without this, the shell's next prompt would just get
+    // drawn on top of gfxtest's last frame instead of a clean
+    // background.
+    //
+    // fb_clear() first: grid_height*FBCON_GLYPH_H doesn't necessarily
+    // cover the full framebuffer height (integer division), so a thin
+    // strip at the bottom of gfxtest's scene would otherwise survive
+    // fbcon_present() untouched -- fbcon_present() only redraws whole
+    // text cells, not stray pixel rows below the last one.
     if (vga_is_graphics_mode())
-        fbcon_clear();
+    {
+        fb_clear(FB_RGB(0, 0, 0));
+        fbcon_present_force();
+    }
 }
 
 void cmd_disktest(void)

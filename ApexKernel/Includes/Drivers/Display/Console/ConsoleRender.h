@@ -26,4 +26,11 @@ void fbcon_draw_cell_present(uint32_t row, uint32_t col, char c, uint8_t attr);
 // would cut redundant work if this ever becomes a bottleneck.
 void fbcon_present(void);
 
+// Same redraw as fbcon_present(), but always runs even while a batch
+// is active. For explicit resets (fbcon_clear(), a command's own
+// full-screen redraw on exit) that need to actually show up right
+// away rather than wait for (or be skipped by) the batch's own
+// end-of-command redraw.
+void fbcon_present_force(void);
+
 #endif // APEX_DRIVERS_DISPLAY_CONSOLE_RENDER_H
