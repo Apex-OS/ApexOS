@@ -15,4 +15,9 @@
 // normal bounds checking inside the glyph-drawing loop.
 void fb_draw_text(uint32_t x, uint32_t y, const char *text, uint32_t scale, uint32_t color);
 
+// fb_draw_glyph_cell() moved to Framebuffer.h -- it needs direct
+// back-buffer access (g_backbuffer/pitch_pixels), which is
+// Framebuffer-internal state that doesn't belong exposed to this
+// module.
+
 #endif // APEX_DRIVERS_DISPLAY_DRAWING_TEXT_H

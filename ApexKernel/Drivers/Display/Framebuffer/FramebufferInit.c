@@ -6,6 +6,7 @@
 #include "Core/Memory/Virtual/PageTables.h"
 #include "Core/Memory/Physical/PageBitmap.h"
 #include "Core/Memory/Heap/Heap.h"
+#include "Arch/x86_64/MTRR.h"
 #include "Logs/Log.h"
 
 bool fb_init(void)
@@ -37,6 +38,18 @@ bool fb_init(void)
         uint64_t addr = phys_base + i * PAGE_SIZE;
         vmm_map(addr, addr, VMM_KERNEL_RW);
     }
+
+    // Marks the framebuffer's physical VRAM range as Write-Combining
+    // (WC). VRAM writes here are always sequential and never read
+    // back before the next write (fb_present()/fb_scroll_up() walk
+    // the buffer linearly) -- exactly the pattern WC exists for: the
+    // CPU buffers consecutive writes and flushes them as burst
+    // transfers instead of one bus cycle per write. Non-fatal if it
+    // fails (older CPU, no free MTRR register, etc.) -- the
+    // framebuffer keeps working at whatever memory type the
+    // firmware/vmm_map() left it at (see mtrr_set_range()'s own
+    // klog_warn for why, if it happens).
+    mtrr_set_range(phys_base, total_bytes, MTRR_TYPE_WC);
 
     g_fb.addr = (uint32_t *)phys_base;
     g_fb.width = boot_info->width;

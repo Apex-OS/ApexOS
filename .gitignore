@@ -3,7 +3,7 @@
 *.iso
 *.img
 *.elf
-build/
+Build/
 .vscode/
 *.swp
 *~

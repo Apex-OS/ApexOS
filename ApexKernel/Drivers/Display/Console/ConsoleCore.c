@@ -131,15 +131,50 @@ void fbcon_putchar(char c)
             cur_row++;
 
         // Only a real scroll (the visible window's content actually
-        // shifted) needs the full grid redraw -- otherwise every line
+        // shifted) needs a scroll redraw -- otherwise every line
         // below the new one is unchanged, so just draw the newly
         // exposed blank line + move the cursor there. This is the
         // difference between ~5600 cells/newline (unusable under
         // QEMU at -O0 -- confirmed via GDB, boot stalling for tens of
         // seconds per log line) and 1 cell.
+        //
+        // When it did scroll: if no manual scrollback offset is
+        // active, this is the single most common case (typing/output
+        // at the bottom of a full screen) and gets the fast path --
+        // fb_scroll_up()'s memmove instead of redrawing all
+        // grid_width * grid_height cells from scrollback. A nonzero
+        // scroll_offset means the user has scrolled back through
+        // history, so the visible window isn't a simple "shift up by
+        // one" relative to what's already on screen; fall back to the
+        // full redraw in that case.
         if (was_scrolled)
         {
-            fbcon_present();
+            if (scroll_offset == 0)
+            {
+                if (!present_suppressed)
+                {
+                    // Erase the cursor at its old position (the
+                    // bottom row as it was just before this newline)
+                    // in real, non-inverted colors before the fast
+                    // scroll path's memmove runs -- otherwise the
+                    // inverted cursor pixels get dragged up along
+                    // with everything else and land on a row this
+                    // fast path never repaints, leaving a permanent
+                    // trail. write_row - 1 (not write_row, which
+                    // fbcon_new_line() already blanked above) is the
+                    // line that was actually on screen with the
+                    // cursor on it -- same lookup the non-scroll
+                    // branch below uses for the same reason.
+                    fbcon_cell_t *old_cell = &scrollback[(write_row - 1) % FBCON_SCROLLBACK_LINES][old_cursor_col];
+                    fbcon_draw_cell(old_cursor_row, old_cursor_col,
+                                    old_cell->c ? old_cell->c : ' ', old_cell->attr);
+                    fbcon_present_scroll_one_line();
+                }
+            }
+            else
+            {
+                fbcon_present();
+            }
         }
         else
         {
@@ -222,7 +257,24 @@ void fbcon_putchar(char c)
             cur_row++;
         if (was_scrolled)
         {
-            fbcon_present();
+            // Same fast-path condition as the '\n' handler above: a
+            // plain scroll (no manual scrollback offset active) uses
+            // fb_scroll_up()'s memmove instead of a full grid redraw.
+            // Also gated on present_suppressed, same as fbcon_present()
+            // itself -- during a batch (fbcon_begin_batch()), nothing
+            // should touch VRAM until fbcon_end_batch()'s single
+            // full-screen redraw, or a multi-line command would
+            // flash each intermediate scroll to the screen instead of
+            // updating atomically once at the end.
+            if (scroll_offset == 0)
+            {
+                if (!present_suppressed)
+                    fbcon_present_scroll_one_line();
+            }
+            else
+            {
+                fbcon_present();
+            }
             return;
         }
     }

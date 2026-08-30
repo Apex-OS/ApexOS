@@ -33,4 +33,16 @@ void fbcon_present(void);
 // end-of-command redraw.
 void fbcon_present_force(void);
 
+// Fast path for the single most common redraw: the view scrolled
+// down by exactly one line because a new line was just written at
+// the bottom (fbcon_new_line()), and no manual scrollback offset is
+// active. Shifts the back-buffer up by one glyph row (fb_scroll_up())
+// instead of redrawing every on-screen cell from scrollback data --
+// only the newly-exposed bottom row needs an actual glyph redraw.
+// Callers must only use this when they know the update really is a
+// plain one-line scroll (scroll_offset == 0, exactly one new line
+// added) -- anything else (manual scrollback, a resize, more than one
+// line at once) still needs fbcon_present_force()'s full redraw.
+void fbcon_present_scroll_one_line(void);
+
 #endif // APEX_DRIVERS_DISPLAY_CONSOLE_RENDER_H

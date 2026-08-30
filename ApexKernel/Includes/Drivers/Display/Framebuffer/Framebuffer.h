@@ -107,4 +107,34 @@ void fb_present(void);
 // edge.
 void fb_present_rect(uint32_t x, uint32_t y, uint32_t w, uint32_t h);
 
+// Scrolls the back-buffer's contents up by `pixel_rows` scanlines:
+// shifts every row still on-screen up by that amount (row Y becomes
+// row Y - pixel_rows), and clears the `pixel_rows` newly-exposed rows
+// at the bottom to `fill_color`. Implemented as a single memmove over
+// the whole back-buffer (safe even with pitch padding, since it moves
+// entire scanlines including any padding) rather than redrawing every
+// on-screen cell from source data -- turns an O(width * height)
+// redraw into an O(width * height) *memmove* (touches the same amount
+// of memory once, sequentially, instead of recomputing every pixel
+// from font data) plus a small fill for the exposed rows. Does not
+// call fb_present()/fb_present_rect() itself -- callers still need to
+// push the result to VRAM. No-op if pixel_rows >= height (nothing
+// would remain on screen; caller should fb_clear() instead).
+void fb_scroll_up(uint32_t pixel_rows, uint32_t fill_color);
+
+// Draws one native-size (8x16, unscaled) glyph cell directly into the
+// back-buffer -- background fill and foreground glyph pixels in a
+// single pass, writing through an incrementing pointer instead of 128
+// separate fb_put_pixel() calls (each of which re-derives its offset
+// via a multiply and pays a full call/ret at this codebase's -O0 build
+// -- see Console/ConsoleRender.c: fbcon_draw_cell(), the only caller,
+// called for every character the console ever prints). x/y are the
+// cell's top-left corner. Clipped to the framebuffer bounds (checked
+// once per cell, not per pixel) -- safe to call with a cell that runs
+// off an edge, same as fb_fill_rect. Lives here rather than in
+// Drawing/Text.c because it needs direct back-buffer indexing
+// (g_backbuffer/pitch_pixels), which is Framebuffer-internal state --
+// same reasoning as fb_scroll_up() above.
+void fb_draw_glyph_cell(uint32_t x, uint32_t y, char c, uint32_t fg, uint32_t bg);
+
 #endif // APEX_DRIVERS_DISPLAY_FRAMEBUFFER_H

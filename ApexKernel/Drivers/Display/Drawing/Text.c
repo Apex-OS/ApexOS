@@ -41,3 +41,6 @@ void fb_draw_text(uint32_t x, uint32_t y, const char *text, uint32_t scale, uint
         cursor_x += FONT8X16_WIDTH * scale;
     }
 }
+
+// fb_draw_glyph_cell() moved to Framebuffer.c -- see Framebuffer.h's
+// comment on the declaration for why.

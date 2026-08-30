@@ -16,6 +16,14 @@ ASMFLAGS_ELF := -f elf64
 # default at -O0 for things like struct copies) causes a silent crash
 # the first time it runs, before any log output -- confirmed the hard
 # way in an earlier session (see project notes).
+#
+# -MMD -MP: emit a .d dependency file alongside each .o, listing every
+# header it #includes. Without this, editing a .h doesn't trigger a
+# rebuild of the .c files that include it -- make only sees the .c
+# file's own timestamp, so a stale .o can silently linger after a
+# header-only change. -MP adds phony targets for each header so a
+# deleted/renamed header doesn't break the build with a "no rule to
+# make target" error.
 CFLAGS    := -m64                   \
              -ffreestanding         \
              -fno-stack-protector   \
@@ -32,6 +40,7 @@ CFLAGS    := -m64                   \
              -std=c11               \
              -O0                    \
              -g                     \
+             -MMD -MP               \
              -IApexKernel/Includes  \
              -IApexLib/Includes
 
@@ -40,146 +49,18 @@ LDFLAGS   := -T Linker.ld           \
              -z noexecstack
 
 # ── Directories ────────────────────────────────────────────────────────────
-BUILD     := build
+BUILD     := Build
 BOOT_DIR  := ApexKernel/Boot/BIOS
 
 # ── Sources ────────────────────────────────────────────────────────────────
-# Generated from the full ApexKernel/ApexLib/Tests tree -- see
-# Meta/Scripts/ for the script that regenerates this list after adding
-# or removing files (mirror_includes.sh's C_SRCS sibling).
-C_SRCS    :=              ApexKernel/Arch/x86_64/GDTExtension.c \
-             ApexKernel/Arch/x86_64/GDTSetup.c \
-             ApexKernel/Bus/PCI/PCI.c \
-             ApexKernel/Bus/Serial/Serial.c \
-             ApexKernel/Core/Init.c \
-             ApexKernel/Core/Interrupts/Exceptions/ExceptionNames.c \
-             ApexKernel/Core/Interrupts/Exceptions/ExceptionReport.c \
-             ApexKernel/Core/Interrupts/Handlers/InterruptDispatch.c \
-             ApexKernel/Core/Interrupts/IDT/IDT.c \
-             ApexKernel/Core/Interrupts/IRQ/IRQDispatch.c \
-             ApexKernel/Core/Interrupts/PIC/PICControl.c \
-             ApexKernel/Core/Interrupts/PIC/PICSetup.c \
-             ApexKernel/Core/Memory/Heap/Heap.c \
-             ApexKernel/Core/Memory/Heap/HeapSetup.c \
-             ApexKernel/Core/Memory/Heap/HeapStats.c \
-             ApexKernel/Core/Memory/MemoryMap/MemoryMap.c \
-             ApexKernel/Core/Memory/MemoryMap/MemoryMapPrinter.c \
-             ApexKernel/Core/Memory/Physical/PageBitmap.c \
-             ApexKernel/Core/Memory/Physical/PhysicalMemoryDetection.c \
-             ApexKernel/Core/Memory/Physical/PhysicalMemoryStats.c \
-             ApexKernel/Core/Memory/Virtual/IdentityMap.c \
-             ApexKernel/Core/Memory/Virtual/PageTables.c \
-             ApexKernel/Core/Memory/Virtual/VirtualMemoryStats.c \
-             ApexKernel/Core/Panic.c \
-             ApexKernel/Core/Shell/CommandDispatcher.c \
-             ApexKernel/Core/Shell/Commands/DiagnosticCommands.c \
-             ApexKernel/Core/Shell/Commands/FilesystemCommands.c \
-             ApexKernel/Core/Shell/Commands/SystemCommands.c \
-             ApexKernel/Core/Shell/Commands/UserspaceTest.c \
-             ApexKernel/Core/Shell/History.c \
-             ApexKernel/Core/Shell/PathResolver.c \
-             ApexKernel/Core/Shell/Prompt.c \
-             ApexKernel/Core/Shell/Shell.c \
-             ApexKernel/Core/Startup/SysDiskSetup.c \
-             ApexKernel/Core/Startup/TestFilesSetup.c \
-             ApexKernel/Core/Syscalls/ABI/SyscallSetup.c \
-             ApexKernel/Core/Syscalls/Dispatcher/SyscallDispatcher.c \
-             ApexKernel/Core/Syscalls/Handlers/SysDriverCall.c \
-             ApexKernel/Core/Syscalls/Handlers/SysExit.c \
-             ApexKernel/Core/Syscalls/Handlers/SysGetPID.c \
-             ApexKernel/Core/Syscalls/Handlers/SysSleep.c \
-             ApexKernel/Core/Syscalls/Handlers/SysWrite.c \
-             ApexKernel/Core/SystemInfo.c \
-             ApexKernel/Core/Tasking/Context/TSS.c \
-             ApexKernel/Core/Tasking/Process/Process.c \
-             ApexKernel/Core/Tasking/Scheduler/ProcessLauncher.c \
-             ApexKernel/Core/Tasking/Scheduler/Scheduler.c \
-             ApexKernel/Core/Tasking/Scheduler/SchedulerStats.c \
-             ApexKernel/Core/Tasking/Scheduler/SchedulerTick.c \
-             ApexKernel/Core/Time/PITCounter.c \
-             ApexKernel/Core/Time/PITSetup.c \
-             ApexKernel/Core/Time/Uptime.c \
-             ApexKernel/Devices/Serial/16550/Serial16550.c \
-             ApexKernel/Drivers/Display/Console/ConsoleCore.c \
-             ApexKernel/Drivers/Display/Console/ConsoleCursor.c \
-             ApexKernel/Drivers/Display/Console/ConsoleRender.c \
-             ApexKernel/Drivers/Display/Console/ConsoleScrollback.c \
-             ApexKernel/Drivers/Display/Drawing/Cursor.c \
-             ApexKernel/Drivers/Display/Drawing/Shapes.c \
-             ApexKernel/Drivers/Display/Drawing/Text.c \
-             ApexKernel/Drivers/Display/Fonts/Font8x16.c \
-             ApexKernel/Drivers/Display/Fonts/Font8x8.c \
-             ApexKernel/Drivers/Display/Framebuffer/Framebuffer.c \
-             ApexKernel/Drivers/Display/Framebuffer/FramebufferInit.c \
-             ApexKernel/Drivers/Display/VGA.c \
-             ApexKernel/Drivers/Input/Keyboard/KeyBuffer.c \
-             ApexKernel/Drivers/Input/Keyboard/Keyboard.c \
-             ApexKernel/Drivers/Input/Keyboard/ScancodeTables.c \
-             ApexKernel/Drivers/Input/Mouse/Mouse.c \
-             ApexKernel/Drivers/Input/Mouse/PS2Port.c \
-             ApexKernel/Drivers/Storage/AHCI/AHCI.c \
-             ApexKernel/Drivers/Storage/AHCI/CommandExecution.c \
-             ApexKernel/Drivers/Storage/AHCI/Controller.c \
-             ApexKernel/Drivers/Storage/AHCI/PortControl.c \
-             ApexKernel/Drivers/Storage/AHCI/PortMemory.c \
-             ApexKernel/Filesystem/AXFS/Allocation/BitOperations.c \
-             ApexKernel/Filesystem/AXFS/Allocation/DataBlockAllocation.c \
-             ApexKernel/Filesystem/AXFS/Allocation/InodeAllocation.c \
-             ApexKernel/Filesystem/AXFS/Allocation/SuperblockSync.c \
-             ApexKernel/Filesystem/AXFS/Content/FileRead.c \
-             ApexKernel/Filesystem/AXFS/Content/FileWrite.c \
-             ApexKernel/Filesystem/AXFS/Directory/DirectoryEntrySearch.c \
-             ApexKernel/Filesystem/AXFS/Directory/Listing.c \
-             ApexKernel/Filesystem/AXFS/Directory/Lookup.c \
-             ApexKernel/Filesystem/AXFS/Directory/TypeQuery.c \
-             ApexKernel/Filesystem/AXFS/Disk/AHCIBackend.c \
-             ApexKernel/Filesystem/AXFS/Disk/DiskRouter.c \
-             ApexKernel/Filesystem/AXFS/Disk/RAMBackend.c \
-             ApexKernel/Filesystem/AXFS/Entry/DirectoryInsertion.c \
-             ApexKernel/Filesystem/AXFS/Entry/EntryLifecycle.c \
-             ApexKernel/Filesystem/AXFS/Entry/InodeCreation.c \
-             ApexKernel/Filesystem/AXFS/Entry/Unlink.c \
-             ApexKernel/Filesystem/AXFS/Inode/InodeRead.c \
-             ApexKernel/Filesystem/AXFS/Inode/InodeWrite.c \
-             ApexKernel/Filesystem/AXFS/Path/PathCreate.c \
-             ApexKernel/Filesystem/AXFS/Path/PathResolve.c \
-             ApexKernel/Filesystem/AXFS/Path/PathSegmentation.c \
-             ApexKernel/Filesystem/AXFS/StringHelpers.c \
-             ApexKernel/Filesystem/AXFS/Tree/DefaultTreeBuilder.c \
-             ApexKernel/Filesystem/AXFS/Tree/DefaultTreeData.c \
-             ApexKernel/Filesystem/AXFS/Volume/FormatWrite.c \
-             ApexKernel/Filesystem/AXFS/Volume/LayoutCalculation.c \
-             ApexKernel/Filesystem/AXFS/Volume/Mount.c \
-             ApexKernel/Filesystem/VFS/FilesystemRouter.c \
-             ApexKernel/Filesystem/VFS/VolumeRegistry.c \
-             ApexKernel/Filesystem/VFS/VolumeSyntax.c \
-             ApexKernel/Formats/AXF/AXD/DriverInvocation.c \
-             ApexKernel/Formats/AXF/AXD/ExportResolution.c \
-             ApexKernel/Formats/AXF/AXD/HeaderValidation.c \
-             ApexKernel/Formats/AXF/AXL/LibraryLoader.c \
-             ApexKernel/Formats/AXF/AXP/HeaderValidation.c \
-             ApexKernel/Formats/AXF/AXP/ImportResolution.c \
-             ApexKernel/Formats/AXF/AXP/ProcessLaunch.c \
-             ApexKernel/Formats/AXF/AXP/SectionLoader.c \
-             ApexLib/Logs/Log.c \
-             Tests/Filesystem/AXFSTest.c \
-             Tests/Filesystem/VFSTest.c \
-             Tests/Kernel/GDTTest.c \
-             Tests/Kernel/HeapTest.c \
-             Tests/Kernel/IDTTest.c \
-             Tests/Kernel/PITTest.c \
-             Tests/Kernel/PMMTest.c \
-             Tests/Kernel/SchedulerTest.c \
-             Tests/Kernel/TestRunner.c \
-             Tests/Kernel/VMMTest.c
+# Auto-discovered from disk via find -- adding or removing a .c/.asm file
+# under these trees is picked up automatically on the next `make`, no
+# manual list to maintain. Excludes Includes/ (headers only, no .c there
+# anyway) implicitly since find only matches *.c/*.asm.
+SRC_DIRS  := ApexKernel ApexLib Tests
 
-ASM_SRCS  :=              ApexKernel/Arch/x86_64/ContextSwitch.asm \
-             ApexKernel/Arch/x86_64/Entry.asm \
-             ApexKernel/Arch/x86_64/GDT.asm \
-             ApexKernel/Arch/x86_64/Interrupts/Interrupts.asm \
-             ApexKernel/Arch/x86_64/Interrupts/TimerInterrupt.asm \
-             ApexKernel/Arch/x86_64/SyscallEntry.asm \
-             ApexKernel/Arch/x86_64/Userspace.asm
+C_SRCS    := $(shell find $(SRC_DIRS) -name '*.c' | sort)
+ASM_SRCS  := $(shell find ApexKernel/Arch -name '*.asm' | sort)
 
 # ── Object files ───────────────────────────────────────────────────────────
 C_OBJS    := $(patsubst %.c, $(BUILD)/%.o, $(C_SRCS))
@@ -245,7 +126,7 @@ $(BUILD)/apex.img: $(BUILD)/stage1.bin $(BUILD)/stage2.bin $(BUILD)/kernel.bin
 	@dd if=$(BUILD)/stage1.bin  of=$@ bs=512 count=1  conv=notrunc status=none
 	@dd if=$(BUILD)/stage2.bin  of=$@ bs=512 seek=1  count=32 conv=notrunc status=none
 	@dd if=$(BUILD)/kernel.bin  of=$@ bs=512 seek=34 conv=notrunc status=none
-	@echo "  OK      apex.img ready ($(shell du -sh $@ | cut -f1))"
+	@echo "  OK      apex.img ready ($$(du -sh $@ | cut -f1))"
 
 # ── QEMU ───────────────────────────────────────────────────────────────────
 run: all
@@ -301,3 +182,11 @@ clean:
 	@echo "  CLEAN"
 	@rm -rf $(BUILD)
 	@echo "  OK"
+
+# ── Header dependency tracking ──────────────────────────────────────────────
+# Pulls in the .d files gcc generated via -MMD -MP (see CFLAGS above), so
+# editing a .h correctly triggers a rebuild of every .c that includes it.
+# The leading '-' silences make's complaint on first build, when no .d
+# files exist yet.
+DEPS := $(C_OBJS:.o=.d)
+-include $(DEPS)
