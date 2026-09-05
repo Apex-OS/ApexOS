@@ -3,15 +3,15 @@
 
 #include "Filesystem/AXFS/Allocation/AllocationInternal.h"
 
-uint64_t alloc_inode_num(axfs_volume_t *vol)
+uint64_t alloc_inode_num(axfs_volume_t *vol, uint32_t transaction_id)
 {
     for (uint64_t i = 0; i < vol->sb.total_inodes; i++)
     {
         if (!bitmap_test_bit(vol, vol->sb.inode_bitmap_block, i))
         {
-            bitmap_set_bit(vol, vol->sb.inode_bitmap_block, i, true);
+            bitmap_set_bit(vol, transaction_id, vol->sb.inode_bitmap_block, i, true);
             vol->sb.free_inodes--;
-            write_superblock(vol);
+            write_superblock(vol, transaction_id);
             return i + 1; // inode numbers are 1-based (0 = "no inode")
         }
     }

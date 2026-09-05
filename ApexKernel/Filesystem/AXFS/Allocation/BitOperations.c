@@ -3,7 +3,7 @@
 
 #include "Filesystem/AXFS/Internal.h"
 
-void bitmap_set_bit(axfs_volume_t *vol, uint64_t bitmap_start_block, uint64_t bit_index, bool value)
+void bitmap_set_bit(axfs_volume_t *vol, uint32_t transaction_id, uint64_t bitmap_start_block, uint64_t bit_index, bool value)
 {
     uint64_t block_offset = bit_index / (AXFS_BLOCK_SIZE * 8);
     uint64_t byte_offset = (bit_index / 8) % AXFS_BLOCK_SIZE;
@@ -17,7 +17,7 @@ void bitmap_set_bit(axfs_volume_t *vol, uint64_t bitmap_start_block, uint64_t bi
     else
         block[byte_offset] &= (uint8_t)~(1u << bit_offset);
 
-    axfs_disk_write_block(&vol->disk, bitmap_start_block + block_offset, block);
+    axfs_disk_write_block_journaled(vol, transaction_id, bitmap_start_block + block_offset, block);
 }
 
 bool bitmap_test_bit(axfs_volume_t *vol, uint64_t bitmap_start_block, uint64_t bit_index)

@@ -6,6 +6,7 @@
 #include "Core/Time/Uptime.h"
 #include "Core/Memory/Physical/PageBitmap.h"
 #include "Drivers/Display/VGA.h"
+#include "Bus/PortIO.h"
 
 void cmd_help(void)
 {
@@ -30,6 +31,8 @@ void cmd_help(void)
     vga_puts("  ring3   - Test Ring 3 userspace\n");
     vga_puts("  gfxtest - Test VESA/VBE graphics mode (one-way, see README)\n");
     vga_puts("  disktest - Read sector 0 via AHCI and verify its boot signature\n");
+    vga_puts("  reboot  - Reboot the machine\n");
+    vga_puts("  shutdown - Power off (QEMU only) / halt\n");
 }
 
 void cmd_clear(void)
@@ -89,4 +92,48 @@ void cmd_echo(const char *args)
 {
     vga_puts(args);
     vga_puts("\n");
+}
+
+void cmd_reboot(void)
+{
+    vga_set_color(VGA_YELLOW, VGA_BLACK);
+    vga_puts("Rebooting...\n");
+    vga_set_color(VGA_WHITE, VGA_BLACK);
+
+    __asm__ volatile("cli");
+
+    uint8_t status;
+    do
+    {
+        status = inb(0x64);
+    } while (status & 0x02);
+
+    outb(0x64, 0xFE); // pulse reset line
+
+    struct __attribute__((packed))
+    {
+        uint16_t limit;
+        uint64_t base;
+    } zero_idt = {0, 0};
+    __asm__ volatile("lidt %0" ::"m"(zero_idt));
+    __asm__ volatile("int3");
+
+    __asm__ volatile("hlt");
+}
+
+void cmd_shutdown(void)
+{
+    vga_set_color(VGA_YELLOW, VGA_BLACK);
+    vga_puts("Shutting down...\n");
+    vga_set_color(VGA_WHITE, VGA_BLACK);
+
+    __asm__ volatile("cli");
+
+    outb(0x604, 0x00);
+    outb(0x605, 0x20);
+
+    vga_set_color(VGA_RED, VGA_BLACK);
+    vga_puts("Shutdown not supported on this platform -- halting instead.\n");
+    vga_set_color(VGA_WHITE, VGA_BLACK);
+    __asm__ volatile("hlt");
 }

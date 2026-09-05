@@ -10,6 +10,7 @@
 // ring, and resets scroll_offset (a fresh newline always brings the
 // view back to the bottom).
 void fbcon_new_line(void);
+void fbcon_advance_line(void);
 
 void fbcon_scroll_up(uint32_t lines);
 void fbcon_scroll_down(uint32_t lines);

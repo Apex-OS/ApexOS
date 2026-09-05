@@ -28,7 +28,10 @@ bool axfs_calculate_layout(const axfs_disk_t *disk, axfs_volume_layout_t *out)
     if (block_bitmap_blocks == 0)
         block_bitmap_blocks = 1;
 
-    uint64_t inode_bitmap_start = 1;
+    uint64_t journal_start = 1; // right after the superblock (block 0)
+    uint64_t journal_blocks = AXFS_JOURNAL_SLOT_COUNT * AXFS_JOURNAL_SLOT_BLOCKS;
+
+    uint64_t inode_bitmap_start = journal_start + journal_blocks;
     uint64_t block_bitmap_start = inode_bitmap_start + inode_bitmap_blocks;
     uint64_t inode_table_start = block_bitmap_start + block_bitmap_blocks;
     uint64_t data_start = inode_table_start + inode_table_blocks;
@@ -38,6 +41,7 @@ bool axfs_calculate_layout(const axfs_disk_t *disk, axfs_volume_layout_t *out)
 
     out->total_blocks = total_blocks;
     out->total_inodes = total_inodes;
+    out->journal_start = journal_start;
     out->inode_bitmap_start = inode_bitmap_start;
     out->inode_bitmap_blocks = inode_bitmap_blocks;
     out->block_bitmap_start = block_bitmap_start;

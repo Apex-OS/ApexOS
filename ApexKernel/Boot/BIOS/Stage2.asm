@@ -14,9 +14,30 @@
 KERNEL_TMP_SEG      equ 0x1000
 KERNEL_TMP_OFF      equ 0x0000
 KERNEL_FINAL_ADDR   equ 0x100000
-KERNEL_SECTORS      equ 200        ; Grown from 160 to fit ahci.c/pci.c --
-                                    ; kernel.bin (82768 bytes as of this
-                                    ; change) exceeded 160 sectors (81920
+KERNEL_SECTORS      equ 400        ; Grown from 200 to 400 (200KB) -- 200 was
+                                    ; itself already a growth from 160 for the
+                                    ; same reason (see below): kernel.bin
+                                    ; exceeded it again (103308 bytes = 202
+                                    ; sectors, just 2 over) once the UEFI
+                                    ; disk-layout support was added, truncating
+                                    ; the loaded kernel and corrupting the
+                                    ; framebuffer almost immediately (confirmed
+                                    ; via a fully isolated test: reverting every
+                                    ; other change still showed the same
+                                    ; corruption until this constant was raised
+                                    ; -- the truncation, not any of the new
+                                    ; logic, was the actual cause). 400 sectors
+                                    ; leaves ~100KB of headroom above the
+                                    ; current size, rather than the ~1-20KB of
+                                    ; margin every previous bump left, which is
+                                    ; what let this recur twice already as the
+                                    ; kernel grows -- this should hold for a
+                                    ; good while longer before needing another
+                                    ; increase.
+                                    ;
+                                    ; Original 160->200 bump's history, kept for
+                                    ; context: kernel.bin (82768 bytes as of
+                                    ; that change) exceeded 160 sectors (81920
                                     ; bytes), truncating the loaded kernel
                                     ; and causing a silent hang before the
                                     ; first boot log (confirmed: build
@@ -77,6 +98,19 @@ MMAP_COUNT          equ 0x95FC ; kept in the 512 bytes just before MMAP_ADDR,
 VBE_INFO_ADDR       equ 0x9000 ; 512-byte VbeInfoBlock (function 4F00h)
 VBE_MODE_INFO_ADDR  equ 0x9200 ; 256-byte ModeInfoBlock, reused per candidate mode (function 4F01h)
 VBE_RESULT_ADDR     equ 0x9300 ; final chosen-mode summary, read by the kernel (see drivers/framebuffer.h)
+
+; Only ever written by the UEFI bootloader (Boot/UEFI/Main.c) -- this
+; BIOS path zeroes it (see HardwareDetect.asm) so
+; Core/Boot/DiskLayout.h's `valid` field reliably reads 0 on a BIOS
+; boot, rather than depending on whatever garbage this low-memory
+; region happened to contain at power-on. Placed in the gap between
+; VBE_RESULT_ADDR's end (0x930C) and MMAP_ADDR (0x9600) -- both of
+; those addresses are already proven safe low-memory scratch space for
+; this bootloader (see MMAP_ADDR's own bug-fix comment above on why
+; *not* every low-memory address is actually safe: 0xA000+ overlaps
+; the EBDA, which real BIOS/firmware can be actively using). Must
+; match DISK_LAYOUT_INFO_ADDR in DiskLayout.h exactly.
+DISK_LAYOUT_INFO_ADDR equ 0x9400
 
 ; Upper bound on the resolution detect_vbe_mode will pick -- see the
 ; comment at the width/height rejection check below for why (kernel

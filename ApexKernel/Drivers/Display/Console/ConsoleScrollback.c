@@ -22,6 +22,14 @@ void fbcon_new_line(void)
     scroll_offset = 0;
 }
 
+void fbcon_advance_line(void)
+{
+    write_row++;
+    if (total_lines < FBCON_SCROLLBACK_LINES)
+        total_lines++;
+    scroll_offset = 0;
+}
+
 void fbcon_scroll_up(uint32_t lines)
 {
     scroll_offset += lines;

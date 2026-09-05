@@ -2,14 +2,16 @@
 // ApexOS -- AXFS (Apex File System) v1
 //
 // On-disk format inspired by ext2 (allocation bitmap + inode table +
-// direct/indirect blocks), simplified for a working V1. No journaling
-// yet (planned for v2) -- a power loss during a write can corrupt the
-// volume.
+// direct/indirect blocks), simplified for a working V1. Full write-
+// ahead journaling (metadata AND file content) protects every write
+// against a crash/power loss mid-operation -- see Journal/Journal.h
+// for the format and recovery model.
 //
 // Disk layout (in AXFS_BLOCK_SIZE blocks):
 //
 //   Block 0            : Superblock
-//   Block 1..N         : Inode bitmap (1 bit per inode)
+//   Block 1..J         : Journal (AXFS_JOURNAL_SLOT_COUNT slots, see Journal/Journal.h)
+//   Block J+1..N       : Inode bitmap (1 bit per inode)
 //   Block N+1..M       : Data block bitmap (1 bit per block)
 //   Block M+1..K       : Inode table (32 inodes per 4KB block)
 //   Block K+1..end     : Data area (file/directory contents)
@@ -31,6 +33,7 @@
 
 #include "Core/Types.h"
 #include "Filesystem/AXFS/Disk/DiskRouter.h"
+#include "Filesystem/AXFS/Journal/Journal.h"
 
 #define AXFS_MAGIC 0x41585653u // "AXVS" little-endian on disk
 #define AXFS_VERSION 1
@@ -78,9 +81,15 @@ typedef struct __attribute__((packed))
     uint64_t free_inodes;
     uint64_t root_inode; // = AXFS_ROOT_INODE
 
+    uint64_t journal_start_block; // Start of the write-ahead journal region
+                                  // (AXFS_JOURNAL_SLOT_COUNT * AXFS_JOURNAL_SLOT_BLOCKS
+                                  // blocks -- see Journal/Journal.h). Sits right after
+                                  // the superblock, before the inode bitmap (see this
+                                  // file's disk layout comment).
+
     char volume_label[32]; // e.g. "SysDisk"
 
-    uint8_t reserved[4096 - 4 - 4 - 4 - 8 - 8 - 8 - 8 - 8 - 8 - 8 - 8 - 8 - 32];
+    uint8_t reserved[4096 - 4 - 4 - 4 - 8 - 8 - 8 - 8 - 8 - 8 - 8 - 8 - 8 - 8 - 32];
 } axfs_superblock_t;
 
 // Inode (256 bytes -- 16 per 4KB block).
@@ -128,13 +137,23 @@ typedef struct __attribute__((packed))
 // disk/superblock aren't valid yet -- Volume/FormatWrite.c's
 // axfs_format() / Volume/Mount.c's axfs_mount() are the only calls
 // safe before that.
-typedef struct
+struct axfs_volume_s
 {
     axfs_disk_t disk;
     axfs_superblock_t sb;
     bool mounted;
     char label[32]; // matches sb.volume_label once mounted; set before that by whoever inits the volume
-} axfs_volume_t;
+
+    // Journal cursor (see Journal/Journal.h) -- in-memory only, never
+    // persisted. Set by axfs_journal_init() (fresh format) or
+    // axfs_journal_recover() (existing volume, run during
+    // axfs_mount()); every axfs_disk_write_block_journaled() call
+    // advances journal_next_slot and axfs_journal_begin_transaction()
+    // advances journal_next_transaction_id.
+    uint32_t journal_next_slot;
+    uint32_t journal_next_transaction_id;
+};
+typedef struct axfs_volume_s axfs_volume_t;
 
 // ── Public driver API ───────────────────────────────────────────────────
 // Every function takes the volume to operate on explicitly -- see the

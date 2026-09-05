@@ -14,6 +14,10 @@
 #include "Drivers/Input/Keyboard/KeyBuffer.h"
 #include "Drivers/Storage/AHCI/AHCI.h"
 #include "Drivers/Storage/AHCI/Controller.h"
+#include "Core/WindowManager/WindowManager.h"
+#include "Core/Compositor/Compositor.h"
+#include "Core/Input/Input.h"
+#include "Widgets/Widgets.h"
 #include "Logs/Log.h"
 
 // Smoke-tests the VESA/VBE framebuffer path (see
@@ -232,4 +236,97 @@ void cmd_disktest(void)
     vga_puts("disktest: write+read-back at sector 1000 ");
     vga_puts(write_ok ? "OK (data matches)" : "MISMATCH");
     vga_puts("\n");
+}
+
+// Draws two demo windows' worth of content once, right after
+// wm_create_window() -- content buffers start zeroed (see
+// WindowManager.c: kcalloc) and are only ever redrawn by whatever
+// owns them (there's no per-frame "redraw every window's content"
+// step in Compositor.c -- see that file's header comment: it composes
+// whatever is already in each window's buffer, it doesn't regenerate
+// it). A real app would redraw its own content in response to its own
+// events; this demo has nothing that changes after the initial draw,
+// so once is enough.
+static void apexui_draw_demo_content(window_id_t win1_id, window_id_t win2_id)
+{
+    window_t *win1 = wm_get_window(win1_id);
+    if (win1 != NULL)
+    {
+        widget_draw_label(win1->content, win1->content_width, win1->content_height,
+                          10, 10, "Hello from ApexUI v1!", WIDGET_LABEL_TEXT_COLOR);
+        widget_draw_button(win1->content, win1->content_width, win1->content_height,
+                           10, 40, 100, 28, "Click me", false);
+    }
+
+    window_t *win2 = wm_get_window(win2_id);
+    if (win2 != NULL)
+    {
+        widget_draw_label(win2->content, win2->content_width, win2->content_height,
+                          10, 10, "Second window", WIDGET_LABEL_TEXT_COLOR);
+        widget_draw_label(win2->content, win2->content_width, win2->content_height,
+                          10, 30, "Drag titlebars, click taskbar", WIDGET_LABEL_TEXT_COLOR);
+    }
+}
+
+// ApexUI v1 demo: window manager + compositor + input + widgets +
+// taskbar, all wired together -- see this file's cmd_gfxtest() for
+// the lower-level graphics primitives this builds on, and
+// ApexUI/Includes/Core/WindowManager/WindowManager.h for the overall
+// v1 scope (in-kernel, hardcoded demo windows, no app-facing syscall
+// yet).
+void cmd_apexui(void)
+{
+    fb_info_t already = fb_get_info();
+    if (already.width == 0 && !fb_init())
+    {
+        klog_error("apexui: no usable graphics mode -- staying in text mode");
+        return;
+    }
+
+    fb_info_t info = fb_get_info();
+    mouse_set_bounds((int32_t)info.width - 1, (int32_t)info.height - 1);
+
+    wm_init();
+    window_id_t win1 = wm_create_window("Welcome", 100, 80, 320, 200);
+    window_id_t win2 = wm_create_window("Info", 250, 180, 300, 160);
+
+    if (win1 == WM_INVALID_WINDOW_ID || win2 == WM_INVALID_WINDOW_ID)
+    {
+        klog_error("apexui: window creation failed (out of memory?) -- aborting");
+        if (win1 != WM_INVALID_WINDOW_ID)
+            wm_close_window(win1);
+        if (win2 != WM_INVALID_WINDOW_ID)
+            wm_close_window(win2);
+        return;
+    }
+
+    apexui_draw_demo_content(win1, win2);
+
+    compositor_draw_frame(); // first frame: full composite, ui_input_poll() hasn't run yet to report a change
+
+    // Exits on any keypress, same one-way-out convention as
+    // cmd_gfxtest() above -- see that function's header comment.
+    while (!keyboard_has_key())
+    {
+        if (ui_input_poll())
+        {
+            if (ui_needs_full_redraw())
+                compositor_draw_frame();
+            else
+                compositor_draw_frame_dirty(ui_get_dirty_rect());
+        }
+    }
+    keyboard_getchar(); // consumes the keypress that ended the loop
+
+    wm_close_window(win1);
+    wm_close_window(win2);
+
+    // Same shell-restoration steps as cmd_gfxtest() -- see that
+    // function's closing comment for why both fb_clear() and
+    // fbcon_present_force() are needed together.
+    if (vga_is_graphics_mode())
+    {
+        fb_clear(FB_RGB(0, 0, 0));
+        fbcon_present_force();
+    }
 }

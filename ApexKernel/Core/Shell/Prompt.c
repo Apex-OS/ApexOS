@@ -31,6 +31,7 @@ void cursor_update(uint8_t row, uint8_t col)
 // start of the input line.
 uint32_t shell_prompt_len = 8; // initial value = former fixed "ApexOS> "
 uint8_t prompt_row = 0;
+static uint32_t prompt_wrapped_lines = 0;
 
 #define SHELL_PROMPT_MAX_PATH_LEN 40
 
@@ -75,26 +76,56 @@ void shell_print_prompt(void)
     cursor_update(vga_get_row(), vga_get_col());
 }
 
-// KNOWN LIMITATION: does not handle a line wrapping past the screen
-// width (80 - 8 = 72 visible columns) -- past that, the display will
-// be incorrect. SHELL_BUFFER_SIZE (4096) allows much longer commands
-// internally, but in-place editing assumes the line fits on a single
-// screen row. A wrap-aware redraw would be the next improvement if
-// needed.
+// Converts a linear position within the input line (0 = the first
+// character right after the prompt) into an actual on-screen (row,
+// col), wrapping at the screen width -- shell_prompt_len + i can run
+// well past a single row once the typed command is longer than what
+// fits after the prompt. If that pushes past the bottom of the
+// screen, this scrolls the view up by the needed number of rows
+// first (adjusting prompt_row to match) so every position always
+// lands on a valid on-screen row.
+void shell_line_to_screen_pos(uint32_t linear_pos, uint8_t *out_row, uint8_t *out_col)
+{
+    uint32_t width = vga_get_width();
+    uint32_t height = vga_get_height();
+
+    uint32_t wrapped_line = linear_pos / width;
+    uint32_t col = linear_pos % width;
+
+    while (prompt_wrapped_lines < wrapped_line)
+    {
+        vga_advance_line();
+        prompt_wrapped_lines++;
+        if (prompt_row + prompt_wrapped_lines >= height)
+            prompt_row--;
+    }
+
+    *out_row = (uint8_t)(prompt_row + wrapped_line);
+    *out_col = (uint8_t)col;
+}
+
 void shell_redraw_line(void)
 {
     for (uint32_t i = 0; i < cmd_len; i++)
-        vga_write_at(prompt_row, shell_prompt_len + i, cmd_buf[i]);
+    {
+        uint8_t row, col;
+        shell_line_to_screen_pos(shell_prompt_len + i, &row, &col);
+        vga_write_at(row, col, cmd_buf[i]);
+    }
 
-    // Clears any leftover characters past the new end (e.g. after a
-    // Backspace, or when loading a shorter command from history).
     static uint32_t last_drawn_len = 0;
     for (uint32_t i = cmd_len; i < last_drawn_len; i++)
-        vga_write_at(prompt_row, shell_prompt_len + i, ' ');
+    {
+        uint8_t row, col;
+        shell_line_to_screen_pos(shell_prompt_len + i, &row, &col);
+        vga_write_at(row, col, ' ');
+    }
     last_drawn_len = cmd_len;
 
-    vga_set_cursor_pos(prompt_row, shell_prompt_len + cmd_cursor);
-    cursor_update(prompt_row, shell_prompt_len + cmd_cursor);
+    uint8_t cursor_row, cursor_col;
+    shell_line_to_screen_pos(shell_prompt_len + cmd_cursor, &cursor_row, &cursor_col);
+    vga_set_cursor_pos(cursor_row, cursor_col);
+    cursor_update(cursor_row, cursor_col);
 }
 
 void shell_load_line(const char *src)

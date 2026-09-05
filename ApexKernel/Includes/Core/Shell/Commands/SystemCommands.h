@@ -10,5 +10,7 @@ void cmd_about(void);
 void cmd_mem(void);
 void cmd_uptime(void);
 void cmd_echo(const char *args);
+void cmd_reboot(void);
+void cmd_shutdown(void);
 
 #endif // APEX_CORE_SHELL_COMMANDS_SYSTEM_H

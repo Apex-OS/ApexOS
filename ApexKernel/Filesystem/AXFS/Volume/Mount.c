@@ -38,6 +38,31 @@ bool axfs_mount(axfs_volume_t *vol)
     vol->sb = sb;
     vol->mounted = true;
 
+    // journal_start_block was added to the superblock alongside
+    // full journaling -- a volume formatted before that has zeros
+    // there (it came from what used to be padding in `reserved[]`),
+    // which would collide with the superblock's own block (0) if
+    // treated as a real journal location. Rather than risk writing
+    // the journal over the superblock on an old volume, journaling is
+    // simply left off for it: axfs_disk_write_block_journaled()'s
+    // callers all check vol->journal_start_block != 0 first (0 is a
+    // real value elsewhere, e.g. an unset field, but never a valid
+    // journal_start_block: block 0 is always the superblock -- see
+    // this module's disk layout comment) and fall back to a plain
+    // axfs_disk_write_block() when it's unset -- same behavior this
+    // volume had before journaling existed, not a regression, just
+    // not yet upgraded. A real migration (recomputing the layout and
+    // shifting the bitmaps/inode table/data that are already written)
+    // is future work, not attempted here.
+    if (sb.journal_start_block == 0)
+    {
+        klog_warn("axfs_mount: volume has no journal region (formatted before journaling existed) -- writes to this volume are not crash-protected until it's reformatted");
+    }
+    else
+    {
+        axfs_journal_recover(vol);
+    }
+
     klog_ok_prefix();
     vga_puts("AXFS mounted: \"");
     vga_puts(sb.volume_label);

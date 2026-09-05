@@ -19,6 +19,6 @@ bool bitmap_test_bit(axfs_volume_t *vol, uint64_t bitmap_start_block, uint64_t b
 // 0. Called after every change to a field that lives in the
 // superblock (free_blocks/free_inodes) so the on-disk copy never
 // drifts from what's cached in RAM.
-void write_superblock(axfs_volume_t *vol);
+void write_superblock(axfs_volume_t *vol, uint32_t transaction_id);
 
 #endif // APEX_FILESYSTEM_AXFS_ALLOCATION_INTERNAL_H

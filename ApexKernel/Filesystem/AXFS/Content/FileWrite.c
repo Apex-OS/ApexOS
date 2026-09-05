@@ -25,6 +25,15 @@ bool axfs_write(axfs_volume_t *vol, uint64_t inode_num, const void *data, uint64
     const uint8_t *src = (const uint8_t *)data;
     uint64_t written = 0;
 
+    // Full journaling (not metadata-only) means file content itself
+    // is covered here too, not just the inode/bitmap bookkeeping --
+    // every block of actual data this loop writes, plus the inode
+    // update at the end, is one transaction. Without this, a crash
+    // partway through a multi-block write leaves the file with some
+    // blocks updated and others still holding old data, with
+    // size_bytes on disk possibly not matching either state.
+    uint32_t txn = axfs_journal_begin_transaction(vol);
+
     while (written < size)
     {
         uint64_t file_pos = offset + written;
@@ -33,7 +42,7 @@ bool axfs_write(axfs_volume_t *vol, uint64_t inode_num, const void *data, uint64
 
         if (inode.direct_blocks[block_index] == 0)
         {
-            uint64_t new_block = alloc_data_block(vol);
+            uint64_t new_block = alloc_data_block(vol, txn);
             if (new_block == 0)
                 return false; // out of space -- partial write already applied, caller should treat as failure
             inode.direct_blocks[block_index] = new_block;
@@ -50,7 +59,7 @@ bool axfs_write(axfs_volume_t *vol, uint64_t inode_num, const void *data, uint64
         for (uint64_t i = 0; i < chunk; i++)
             buf[block_offset + i] = src[written + i];
 
-        if (!axfs_disk_write_block(&vol->disk, inode.direct_blocks[block_index], buf))
+        if (!axfs_disk_write_block_journaled(vol, txn, inode.direct_blocks[block_index], buf))
             return false;
 
         written += chunk;
@@ -60,5 +69,9 @@ bool axfs_write(axfs_volume_t *vol, uint64_t inode_num, const void *data, uint64
         inode.size_bytes = offset + size;
     inode.modified_at = pit_get_ticks();
 
-    return write_inode(vol, inode_num, &inode);
+    bool ok = write_inode(vol, txn, inode_num, &inode);
+
+    axfs_journal_commit_transaction(vol, txn);
+
+    return ok;
 }

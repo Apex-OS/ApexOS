@@ -27,4 +27,6 @@ void shell_redraw_line(void);
 // entry) and redraws the line.
 void shell_load_line(const char *src);
 
+void shell_line_to_screen_pos(uint32_t linear_pos, uint8_t *out_row, uint8_t *out_col);
+
 #endif // APEX_CORE_SHELL_PROMPT_H

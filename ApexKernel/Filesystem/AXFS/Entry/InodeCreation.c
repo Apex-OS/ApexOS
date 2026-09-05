@@ -5,9 +5,9 @@
 #include "Filesystem/AXFS/Internal.h"
 #include "Core/Time/PITCounter.h"
 
-uint64_t axfs_create_inode(axfs_volume_t *vol, uint64_t parent_inode, axfs_inode_type_t type)
+uint64_t axfs_create_inode(axfs_volume_t *vol, uint32_t transaction_id, uint64_t parent_inode, axfs_inode_type_t type)
 {
-    uint64_t new_inode_num = alloc_inode_num(vol);
+    uint64_t new_inode_num = alloc_inode_num(vol, transaction_id);
     if (new_inode_num == 0)
         return 0;
 
@@ -26,10 +26,10 @@ uint64_t axfs_create_inode(axfs_volume_t *vol, uint64_t parent_inode, axfs_inode
 
     if (type == AXFS_TYPE_DIR)
     {
-        uint64_t dir_block = alloc_data_block(vol);
+        uint64_t dir_block = alloc_data_block(vol, transaction_id);
         if (dir_block == 0)
         {
-            bitmap_set_bit(vol, vol->sb.inode_bitmap_block, new_inode_num - 1, false);
+            bitmap_set_bit(vol, transaction_id, vol->sb.inode_bitmap_block, new_inode_num - 1, false);
             vol->sb.free_inodes++;
             return 0;
         }
@@ -57,11 +57,11 @@ uint64_t axfs_create_inode(axfs_volume_t *vol, uint64_t parent_inode, axfs_inode
         dotdot->entry_size = AXFS_DIRENT_HEADER_SIZE + dotdot->name_len;
         off += dotdot->entry_size;
 
-        axfs_disk_write_block(&vol->disk, dir_block, dir_buf);
+        axfs_disk_write_block_journaled(vol, transaction_id, dir_block, dir_buf);
         new_inode.size_bytes = off;
     }
 
-    write_inode(vol, new_inode_num, &new_inode);
+    write_inode(vol, transaction_id, new_inode_num, &new_inode);
 
     return new_inode_num;
 }

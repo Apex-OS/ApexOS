@@ -15,7 +15,7 @@
 // write_inode()'ing it back afterward. Returns false if no room could
 // be found/allocated -- caller should treat this as a full rollback
 // signal (see axfs_create() in EntryLifecycle.c).
-bool axfs_insert_dirent(axfs_volume_t *vol, axfs_inode_t *parent, const char *name,
+bool axfs_insert_dirent(axfs_volume_t *vol, uint32_t transaction_id, axfs_inode_t *parent, const char *name,
                         uint32_t name_len, uint64_t inode_num, axfs_inode_type_t type);
 
 #endif // APEX_FILESYSTEM_AXFS_DIRECTORY_INSERTION_H

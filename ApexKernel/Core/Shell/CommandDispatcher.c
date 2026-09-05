@@ -159,12 +159,33 @@ void shell_execute(void)
         else
             cmd_gfxtest();
     }
+    else if (str_eq(cmd_name, "apexui"))
+    {
+        if (args[0] != '\0')
+            klog_error("apexui: too many arguments");
+        else
+            cmd_apexui();
+    }
     else if (str_eq(cmd_name, "disktest"))
     {
         if (args[0] != '\0')
             klog_error("disktest: too many arguments");
         else
             cmd_disktest();
+    }
+    else if (str_eq(cmd_name, "reboot"))
+    {
+        if (args[0] != '\0')
+            klog_error("reboot: too many arguments");
+        else
+            cmd_reboot();
+    }
+    else if (str_eq(cmd_name, "shutdown"))
+    {
+        if (args[0] != '\0')
+            klog_error("shutdown: too many arguments");
+        else
+            cmd_shutdown();
     }
     else
     {

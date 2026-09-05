@@ -69,6 +69,8 @@ static uint8_t vga_row = 0; // on-screen write row (0..VGA_HEIGHT-1); matches wr
 static uint8_t vga_attr = 0;
 uint8_t vga_get_row(void) { return graphics_mode ? fbcon_get_row() : vga_row; }
 uint8_t vga_get_col(void) { return graphics_mode ? fbcon_get_col() : vga_col; }
+uint32_t vga_get_width(void) { return graphics_mode ? fbcon_get_width() : VGA_WIDTH; }
+uint32_t vga_get_height(void) { return graphics_mode ? fbcon_get_height() : VGA_HEIGHT; }
 
 static inline uint8_t vga_make_attr(vga_color_t fg, vga_color_t bg)
 {
@@ -136,6 +138,14 @@ static void vga_new_line(void)
         scrollback[line][c] = vga_make_entry(' ', default_blank_attr);
 
     scroll_offset = 0; // any new write jumps back to live
+}
+
+static void vga_advance_line_internal(void)
+{
+    write_row++;
+    if (total_lines < SCROLLBACK_LINES)
+        total_lines++;
+    scroll_offset = 0;
 }
 
 void vga_init(void)
@@ -399,6 +409,14 @@ bool vga_is_scrolled(void)
     if (graphics_mode)
         return fbcon_get_scroll_offset() != 0;
     return scroll_offset != 0;
+}
+
+void vga_advance_line(void)
+{
+    if (graphics_mode)
+        fbcon_advance_line();
+    else
+        vga_advance_line_internal();
 }
 
 static uint32_t text_batch_start_total_lines = 0;

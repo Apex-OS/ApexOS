@@ -146,8 +146,8 @@ void mouse_handler(void)
         // positive going DOWN (row 0 = top) -- flipped here so
         // "moving the mouse up" moves the cursor up on screen, not
         // down.
-        state.x -= delta_x;
-        state.y += delta_y;
+        state.x += delta_x;
+        state.y -= delta_y;
 
         if (state.x < 0)
             state.x = 0;

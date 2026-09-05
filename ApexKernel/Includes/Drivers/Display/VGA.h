@@ -72,6 +72,8 @@ void vga_show_cursor(void);
 
 uint8_t vga_get_row(void);
 uint8_t vga_get_col(void);
+uint32_t vga_get_width(void);
+uint32_t vga_get_height(void);
 
 // Moves the logical cursor (vga_row/vga_col) without writing
 // anything. Used by the shell to reposition the cursor during command
@@ -90,6 +92,7 @@ void vga_scroll_down(uint32_t lines);
 // True if the view is currently scrolled up into history (not showing
 // the live/bottom of the buffer).
 bool vga_is_scrolled(void);
+void vga_advance_line(void);
 void vga_begin_batch(void);
 void vga_end_batch(void);
 

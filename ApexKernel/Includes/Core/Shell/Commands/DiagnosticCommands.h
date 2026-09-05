@@ -6,5 +6,6 @@
 
 void cmd_gfxtest(void);
 void cmd_disktest(void);
+void cmd_apexui(void);
 
 #endif // APEX_CORE_SHELL_COMMANDS_DIAGNOSTIC_H

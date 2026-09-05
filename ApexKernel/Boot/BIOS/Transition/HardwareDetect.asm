@@ -61,6 +61,19 @@ detect_vbe_mode:
     xor al, al
     rep stosb
 
+    ; Also zeroes DISK_LAYOUT_INFO_ADDR's `valid` byte (see
+    ; Core/Boot/DiskLayout.h) -- only ever written by the UEFI
+    ; bootloader path (Boot/UEFI/Main.c), never this BIOS one, so
+    ; without this it would hold whatever this low-memory region
+    ; happened to contain at power-on rather than reliably reading as
+    ; "no UEFI disk layout info available" on a BIOS boot. 9 bytes:
+    ; disk_layout_info_t is 8 (uint64_t sysdisk_start_lba) + 1
+    ; (uint8_t valid), packed -- see DiskLayout.h.
+    mov di, DISK_LAYOUT_INFO_ADDR
+    mov cx, 9
+    xor al, al
+    rep stosb
+
     ; Zeroes the VBE info buffer too -- BUG FIX: this was left
     ; uninitialized before, and only the 4-byte 'VBE2' signature was
     ; written into it. If the BIOS doesn't fill the ENTIRE 512-byte

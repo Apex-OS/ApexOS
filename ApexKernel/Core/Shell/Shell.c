@@ -63,7 +63,9 @@ void shell_run(void)
         if (c == '\n')
         {
             cmd_buf[cmd_len] = '\0';
-            vga_set_cursor_pos(prompt_row, shell_prompt_len + cmd_len);
+            uint8_t end_row, end_col;
+            shell_line_to_screen_pos(shell_prompt_len + cmd_len, &end_row, &end_col);
+            vga_set_cursor_pos(end_row, end_col);
             vga_putchar('\n');
             shell_history_push(cmd_buf);
             vga_begin_batch();
@@ -90,8 +92,10 @@ void shell_run(void)
             if (cmd_cursor > 0)
             {
                 cmd_cursor--;
-                vga_set_cursor_pos(prompt_row, shell_prompt_len + cmd_cursor);
-                cursor_update(prompt_row, shell_prompt_len + cmd_cursor);
+                uint8_t row, col;
+                shell_line_to_screen_pos(shell_prompt_len + cmd_cursor, &row, &col);
+                vga_set_cursor_pos(row, col);
+                cursor_update(row, col);
             }
         }
         else if (c == KEY_ARROW_RIGHT)
@@ -99,8 +103,10 @@ void shell_run(void)
             if (cmd_cursor < cmd_len)
             {
                 cmd_cursor++;
-                vga_set_cursor_pos(prompt_row, shell_prompt_len + cmd_cursor);
-                cursor_update(prompt_row, shell_prompt_len + cmd_cursor);
+                uint8_t row, col;
+                shell_line_to_screen_pos(shell_prompt_len + cmd_cursor, &row, &col);
+                vga_set_cursor_pos(row, col);
+                cursor_update(row, col);
             }
         }
         else if (c == KEY_ARROW_UP)

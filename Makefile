@@ -42,7 +42,8 @@ CFLAGS    := -m64                   \
              -g                     \
              -MMD -MP               \
              -IApexKernel/Includes  \
-             -IApexLib/Includes
+             -IApexLib/Includes    \
+             -IApexUI/Includes
 
 LDFLAGS   := -T Linker.ld           \
              -nostdlib              \
@@ -57,7 +58,7 @@ BOOT_DIR  := ApexKernel/Boot/BIOS
 # under these trees is picked up automatically on the next `make`, no
 # manual list to maintain. Excludes Includes/ (headers only, no .c there
 # anyway) implicitly since find only matches *.c/*.asm.
-SRC_DIRS  := ApexKernel ApexLib Tests
+SRC_DIRS  := ApexKernel ApexLib ApexUI Tests
 
 C_SRCS    := $(shell find $(SRC_DIRS) -name '*.c' | sort)
 ASM_SRCS  := $(shell find ApexKernel/Arch -name '*.asm' | sort)

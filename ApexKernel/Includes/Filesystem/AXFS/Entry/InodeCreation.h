@@ -15,6 +15,6 @@
 // failure, any partial allocation this call made is already rolled
 // back before returning. `parent_inode` is only needed for a
 // directory's ".." entry.
-uint64_t axfs_create_inode(axfs_volume_t *vol, uint64_t parent_inode, axfs_inode_type_t type);
+uint64_t axfs_create_inode(axfs_volume_t *vol, uint32_t transaction_id, uint64_t parent_inode, axfs_inode_type_t type);
 
 #endif // APEX_FILESYSTEM_AXFS_INODE_CREATION_H

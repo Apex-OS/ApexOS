@@ -34,6 +34,7 @@ bool axfs_format(axfs_volume_t *vol, const char *volume_label)
     sb.total_inodes = layout.total_inodes;
     sb.free_inodes = layout.total_inodes - 1;
     sb.root_inode = AXFS_ROOT_INODE;
+    sb.journal_start_block = layout.journal_start;
 
     uint32_t label_len = str_len(volume_label);
     if (label_len > 31)
@@ -48,6 +49,15 @@ bool axfs_format(axfs_volume_t *vol, const char *volume_label)
     for (uint32_t i = 0; i < AXFS_BLOCK_SIZE; i++)
         zero_buf[i] = 0;
 
+    uint64_t journal_blocks = AXFS_JOURNAL_SLOT_COUNT * AXFS_JOURNAL_SLOT_BLOCKS;
+    for (uint64_t i = 0; i < journal_blocks; i++)
+        axfs_disk_write_block(&vol->disk, sb.journal_start_block + i, zero_buf);
+    // Every journal slot's status field is the first 4 bytes of its
+    // metadata block (see Journal.h's axfs_journal_slot_meta_t) --
+    // zeroing the block makes status == AXFS_JOURNAL_FREE (0) for
+    // free, matching axfs_journal_recover()'s expectations on a fresh
+    // volume with no real recovery work to do.
+
     for (uint64_t i = 0; i < layout.inode_bitmap_blocks; i++)
         axfs_disk_write_block(&vol->disk, layout.inode_bitmap_start + i, zero_buf);
     for (uint64_t i = 0; i < layout.block_bitmap_blocks; i++)
@@ -58,9 +68,18 @@ bool axfs_format(axfs_volume_t *vol, const char *volume_label)
     vol->sb = sb;
     vol->mounted = true;
 
-    bitmap_set_bit(vol, vol->sb.inode_bitmap_block, 0, true);
+    // Must run before any axfs_disk_write_block_journaled() call
+    // below -- it sets journal_next_slot/journal_next_transaction_id,
+    // which would otherwise be whatever uninitialized memory
+    // axfs_volume_t happened to contain (vol is typically a static
+    // instance -- see AXFS.h's axfs_volume_t comment -- so in
+    // practice zero-initialized, but relying on that here would be
+    // fragile).
+    axfs_journal_init(vol);
 
-    uint64_t root_data_block = alloc_data_block(vol);
+    bitmap_set_bit(vol, 0, vol->sb.inode_bitmap_block, 0, true);
+
+    uint64_t root_data_block = alloc_data_block(vol, 0);
     if (root_data_block == 0)
     {
         vol->mounted = false;
@@ -105,10 +124,10 @@ bool axfs_format(axfs_volume_t *vol, const char *volume_label)
     dotdot->entry_size = AXFS_DIRENT_HEADER_SIZE + dotdot->name_len;
     offset += dotdot->entry_size;
 
-    axfs_disk_write_block(&vol->disk, root_data_block, dir_buf);
+    axfs_disk_write_block_journaled(vol, 0, root_data_block, dir_buf);
 
     root.size_bytes = offset;
-    write_inode(vol, AXFS_ROOT_INODE, &root);
+    write_inode(vol, 0, AXFS_ROOT_INODE, &root);
 
     axfs_disk_write_block(&vol->disk, 0, &vol->sb);
 

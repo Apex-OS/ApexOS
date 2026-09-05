@@ -14,6 +14,7 @@ typedef struct
 {
     uint64_t total_blocks;
     uint64_t total_inodes;
+    uint64_t journal_start;
     uint64_t inode_bitmap_start;
     uint64_t inode_bitmap_blocks;
     uint64_t block_bitmap_start;

@@ -3,7 +3,7 @@
 
 #include "Filesystem/AXFS/Internal.h"
 
-bool write_inode(axfs_volume_t *vol, uint64_t inode_num, const axfs_inode_t *in)
+bool write_inode(axfs_volume_t *vol, uint32_t transaction_id, uint64_t inode_num, const axfs_inode_t *in)
 {
     if (inode_num == 0 || inode_num > vol->sb.total_inodes)
         return false;
@@ -19,5 +19,5 @@ bool write_inode(axfs_volume_t *vol, uint64_t inode_num, const axfs_inode_t *in)
     axfs_inode_t *inode = (axfs_inode_t *)(buf + offset_in_block);
     *inode = *in;
 
-    return axfs_disk_write_block(&vol->disk, block, buf);
+    return axfs_disk_write_block_journaled(vol, transaction_id, block, buf);
 }

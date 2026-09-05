@@ -27,14 +27,21 @@
 // alloc_inode_num()/free_data_block() where possible -- they also keep
 // vol->sb.free_blocks/free_inodes in sync, which a raw bitmap_set_bit()
 // call does not.
-void bitmap_set_bit(axfs_volume_t *vol, uint64_t bitmap_start_block, uint64_t bit_index, bool value);
-uint64_t alloc_data_block(axfs_volume_t *vol);
-void free_data_block(axfs_volume_t *vol, uint64_t block_num);
-uint64_t alloc_inode_num(axfs_volume_t *vol);
+//
+// All of these take a transaction_id (see Journal/Journal.h) --
+// pass 0 for a standalone write not grouped with others (each write
+// is still individually journaled and self-consistent on its own,
+// see axfs_disk_write_block_journaled()'s comment), or an ID from
+// axfs_journal_begin_transaction() to group several writes as one
+// logical operation.
+void bitmap_set_bit(axfs_volume_t *vol, uint32_t transaction_id, uint64_t bitmap_start_block, uint64_t bit_index, bool value);
+uint64_t alloc_data_block(axfs_volume_t *vol, uint32_t transaction_id);
+void free_data_block(axfs_volume_t *vol, uint32_t transaction_id, uint64_t block_num);
+uint64_t alloc_inode_num(axfs_volume_t *vol, uint32_t transaction_id);
 
 // ── Inode I/O and directory lookup (Inode/, Directory/) ─────────────────
 bool read_inode(axfs_volume_t *vol, uint64_t inode_num, axfs_inode_t *out);
-bool write_inode(axfs_volume_t *vol, uint64_t inode_num, const axfs_inode_t *in);
+bool write_inode(axfs_volume_t *vol, uint32_t transaction_id, uint64_t inode_num, const axfs_inode_t *in);
 uint64_t dir_find_entry(axfs_volume_t *vol, const axfs_inode_t *dir, const char *name,
                         uint64_t *out_block, uint32_t *out_offset);
 
