@@ -29,6 +29,7 @@
 #include "Drivers/Input/Keyboard/Keyboard.h"
 #include "Drivers/Input/Mouse/Mouse.h"
 #include "Drivers/Storage/AHCI/AHCI.h"
+#include "Drivers/Network/Vendors/Intel/E1000.h"
 
 void kmain(void)
 {
@@ -126,6 +127,16 @@ void kmain(void)
     mouse_init();
     pic_unmask_irq(2);  // slave PIC cascade -- needed for IRQ8-15
     pic_unmask_irq(12); // mouse
+
+    // Detects an Intel e1000 NIC on the PCI bus and brings it up
+    // (MMIO mapping, reset, RX/TX rings) -- see Drivers/Network/
+    // Vendors/Intel/E1000.c. Non-fatal if no e1000 is present (no PCI
+    // NIC at all, or a different chip -- other vendors are future
+    // work, see the project roadmap): the kernel boots to a usable
+    // shell either way, same fallback philosophy as ahci_init() above.
+    // Polling-mode only for now, so no pic_unmask_irq() call needed
+    // (see E1000.h's header comment on why).
+    e1000_init();
 
     // Clamps mouse tracking to the real screen bounds now that
     // graphics mode is up (see fb_init()/vga_enable_graphics_mode()

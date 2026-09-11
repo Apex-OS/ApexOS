@@ -24,6 +24,22 @@
 // Physical address of the kernel PML4 (set up by stage2 at boot).
 #define KERNEL_PML4 0x1000
 
+// Scratch address used transiently by vmm_init() (IdentityMap.c) to
+// build the initial identity map before it's known safe to write into
+// KERNEL_PML4 directly -- see that function's header comment. Unused
+// by both boot paths and within the low-1MB range
+// PhysicalMemoryDetection.c's pmm_init() already reserves
+// unconditionally, so nothing else can ever claim it either.
+#define SCRATCH_PML4 0x7000
+
+// When true, vmm_map()/vmm_get_or_create() (PageTables.c) build into
+// SCRATCH_PML4 instead of KERNEL_PML4. Set only by vmm_init() while
+// it builds the initial identity map; false the rest of the kernel's
+// life, when KERNEL_PML4 is the live table again and every other
+// vmm_map() call (heap growth, Ring3 mappings, AHCI DMA buffers, ...)
+// must target it as normal.
+extern bool building_scratch_pml4;
+
 // Extracts each page-table index from a virtual address.
 #define PML4_IDX(a) (((a) >> 39) & 0x1FF)
 #define PDPT_IDX(a) (((a) >> 30) & 0x1FF)

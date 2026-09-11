@@ -136,6 +136,8 @@ run: all
 		-M q35                       \
 		-drive file=$(BUILD)/apex.img,format=raw,index=0,media=disk \
 		-m 256M                      \
+		-netdev user,id=net0         \
+  		-device e1000,netdev=net0    \
 		-serial stdio                \
 		-no-reboot                   \
 		-no-shutdown                 \
@@ -147,9 +149,13 @@ run-emergency: all
         -M q35                       \
 		-drive file=$(BUILD)/apex.img,format=raw,index=0,media=disk \
 		-m 256M                      \
+		-netdev user,id=net0         \
+  		-device e1000,netdev=net0    \
 		-serial stdio                \
-		-vga cirrus                  \
-		-display sdl
+		-no-reboot                   \
+		-no-shutdown                 \
+		-display sdl                 \
+		-vga cirrus
 
 run-debug-int: all
 	@echo "  QEMU    Launching with interrupt logging..."
@@ -157,13 +163,14 @@ run-debug-int: all
 		-M q35                       \
 		-drive file=$(BUILD)/apex.img,format=raw,index=0,media=disk \
 		-m 256M                      \
+		-netdev user,id=net0         \
+  		-device e1000,netdev=net0    \
 		-serial stdio                \
 		-no-reboot                   \
 		-no-shutdown                 \
-		-accel tcg                   \
-		-d int,cpu_reset              \
-		-D qemu-debug.log             \
-		-display sdl
+		-display sdl                 \
+		-d int,cpu_reset             \
+		-D qemu-debug.log
 
 # ── QEMU + GDB debug ───────────────────────────────────────────────────────
 debug: all
@@ -172,6 +179,8 @@ debug: all
 		-M q35                   \
 		-drive file=$(BUILD)/apex.img,format=raw,index=0,media=disk \
 		-m 256M                  \
+		-netdev user,id=net0         \
+  		-device e1000,netdev=net0    \
 		-serial stdio            \
 		-no-reboot               \
 		-no-shutdown             \

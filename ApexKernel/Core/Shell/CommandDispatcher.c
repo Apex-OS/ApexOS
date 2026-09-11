@@ -173,6 +173,16 @@ void shell_execute(void)
         else
             cmd_disktest();
     }
+    else if (str_eq(cmd_name, "arptest"))
+        cmd_arptest(args);
+    else if (str_eq(cmd_name, "ping"))
+        cmd_ping(args);
+    else if (str_eq(cmd_name, "dnstest"))
+        cmd_dnstest(args);
+    else if (str_eq(cmd_name, "tcptest"))
+        cmd_tcptest(args);
+    else if (str_eq(cmd_name, "serialmirror"))
+        cmd_serialmirror(args);
     else if (str_eq(cmd_name, "reboot"))
     {
         if (args[0] != '\0')

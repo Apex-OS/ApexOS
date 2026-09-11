@@ -31,6 +31,11 @@ void cmd_help(void)
     vga_puts("  ring3   - Test Ring 3 userspace\n");
     vga_puts("  gfxtest - Test VESA/VBE graphics mode (one-way, see README)\n");
     vga_puts("  disktest - Read sector 0 via AHCI and verify its boot signature\n");
+    vga_puts("  arptest - Resolve an IPv4 address to a MAC via ARP (arptest [A.B.C.D])\n");
+    vga_puts("  ping    - ICMP echo request/reply (ping [A.B.C.D] [count])\n");
+    vga_puts("  dnstest - Resolve a hostname via DNS (dnstest [hostname])\n");
+    vga_puts("  tcptest - TCP handshake + HTTP GET over a real connection (tcptest [hostname])\n");
+    vga_puts("  serialmirror - Mirror screen output to COM1 (serialmirror on|off)\n");
     vga_puts("  reboot  - Reboot the machine\n");
     vga_puts("  shutdown - Power off (QEMU only) / halt\n");
 }

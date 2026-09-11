@@ -19,6 +19,14 @@
 #include "Core/Input/Input.h"
 #include "Widgets/Widgets.h"
 #include "Logs/Log.h"
+#include "Network/Protocols/Ethernet/Ethernet.h"
+#include "Network/Protocols/ARP/ARP.h"
+#include "Network/Protocols/IPv4/IPv4.h"
+#include "Network/Protocols/ICMP/ICMP.h"
+#include "Network/Protocols/UDP/UDP.h"
+#include "Network/Protocols/TCP/TCP.h"
+#include "Core/Time/PITCounter.h"
+#include "Core/Shell/PathResolver.h"
 
 // Smoke-tests the VESA/VBE framebuffer path (see
 // ApexKernel/Drivers/Display/Framebuffer/ and
@@ -238,6 +246,279 @@ void cmd_disktest(void)
     vga_puts("\n");
 }
 
+// Parses "A.B.C.D" into 4 bytes. No error reporting beyond a bool --
+// this is a throwaway test command's input parser (see
+// DiagnosticCommands.h's header comment on cmd_arptest), not a
+// general-purpose one worth a shared StringHelpers.c entry yet.
+static bool parse_ipv4(const char *s, uint8_t out_ip[4])
+{
+    int part = 0;
+    int value = 0;
+    bool any_digit = false;
+
+    for (;; s++)
+    {
+        if (*s >= '0' && *s <= '9')
+        {
+            value = value * 10 + (*s - '0');
+            any_digit = true;
+            if (value > 255)
+                return false;
+        }
+        else if (*s == '.' || *s == '\0')
+        {
+            if (!any_digit || part > 3)
+                return false;
+            out_ip[part++] = (uint8_t)value;
+            value = 0;
+            any_digit = false;
+            if (*s == '\0')
+                break;
+        }
+        else
+            return false;
+    }
+
+    return part == 4;
+}
+
+static void print_mac(const uint8_t mac[ETH_MAC_LEN])
+{
+    for (int i = 0; i < ETH_MAC_LEN; i++)
+    {
+        vga_puthex(mac[i]);
+        if (i < ETH_MAC_LEN - 1)
+            vga_puts(":");
+    }
+}
+
+// TEST TEMPORAIRE (réseau) -- see DiagnosticCommands.h's header
+// comment. Resolves one IPv4 address via ARP and prints the result:
+// exercises Network/Protocols/Ethernet/Ethernet.c and
+// Network/Protocols/ARP/ARP.c end to end (frame construction, real
+// e1000 TX, polling RX, ARP request/reply parsing) against a real
+// peer (QEMU's own "-netdev user" gateway, 10.0.2.2, always present
+// and always answers ARP -- see the Makefile's `run` target).
+void cmd_arptest(const char *args)
+{
+    uint8_t target_ip[4] = {10, 0, 2, 2}; // QEMU user-mode gateway, default target
+
+    if (args[0] != '\0' && !parse_ipv4(args, target_ip))
+    {
+        klog_error("arptest: usage: arptest [A.B.C.D] (bad IP format)");
+        return;
+    }
+
+    // This kernel's own IPv4 address -- hardcoded for this test (no
+    // DHCP/static config yet, see the roadmap's IPv4 step). 10.0.2.15
+    // is QEMU user-mode networking's default guest address, so ARP
+    // replies from the gateway are addressed back to something real.
+    uint8_t own_ip[4] = {10, 0, 2, 15};
+
+    eth_init();
+    arp_init(own_ip);
+
+    uint8_t own_mac[ETH_MAC_LEN];
+    eth_get_mac(own_mac);
+    klog_ok_prefix();
+    vga_puts("arptest: own MAC ");
+    print_mac(own_mac);
+    vga_puts("\n");
+
+    klog_ok_prefix();
+    vga_puts("arptest: resolving ");
+    vga_putdec(target_ip[0]);
+    vga_puts(".");
+    vga_putdec(target_ip[1]);
+    vga_puts(".");
+    vga_putdec(target_ip[2]);
+    vga_puts(".");
+    vga_putdec(target_ip[3]);
+    vga_puts(" (timeout 2000ms)...\n");
+
+    uint8_t resolved_mac[ETH_MAC_LEN];
+    if (arp_resolve(target_ip, resolved_mac, 2000))
+    {
+        klog_ok_prefix();
+        vga_puts("arptest: resolved to ");
+        print_mac(resolved_mac);
+        vga_puts("\n");
+    }
+    else
+        klog_error("arptest: timed out -- no ARP reply received");
+}
+
+// Parses a single non-negative decimal integer. No error reporting
+// beyond a bool -- same throwaway-test-input reasoning as
+// parse_ipv4() above.
+static bool parse_uint(const char *s, uint32_t *out)
+{
+    if (*s == '\0')
+        return false;
+
+    uint32_t value = 0;
+    for (; *s; s++)
+    {
+        if (*s < '0' || *s > '9')
+            return false;
+        value = value * 10 + (uint32_t)(*s - '0');
+    }
+    *out = value;
+    return true;
+}
+
+// Splits "A.B.C.D [count]" into its IP and optional count part --
+// `ip_out`/`ip_out_size` receives the IP substring (for parse_ipv4),
+// `count_out` receives the trailing digits if present or NULL-ish
+// (empty string) if not. Mirrors CommandDispatcher.c's own
+// tokenize_command() approach (skip leading/trailing spaces, split on
+// the first run of spaces) rather than pulling in a shared tokenizer
+// for what's still just one throwaway test command's argument
+// parsing.
+static void split_ping_args(const char *args, char *ip_out, uint32_t ip_out_size, char **count_out)
+{
+    while (*args == ' ')
+        args++;
+
+    uint32_t i = 0;
+    while (args[i] && args[i] != ' ' && i < ip_out_size - 1)
+    {
+        ip_out[i] = args[i];
+        i++;
+    }
+    ip_out[i] = '\0';
+
+    args += i;
+    while (*args == ' ')
+        args++;
+
+    *count_out = (char *)args;
+}
+
+// TEST/COMMANDE RÉSEAU -- ping via ICMP Echo Request/Reply, see
+// Network/Protocols/ICMP/ICMP.h. Exercises the full stack end to end:
+// Ethernet + ARP (address resolution) + IPv4 (addressing, checksum)
+// + ICMP (the actual echo). This is the project roadmap's final
+// milestone for the networking step (e1000 -> Ethernet -> ARP -> IPv4
+// -> ICMP -> ping).
+void cmd_ping(const char *args)
+{
+    char ip_str[32];
+    char *count_str;
+    split_ping_args(args, ip_str, sizeof(ip_str), &count_str);
+
+    uint8_t target_ip[4] = {10, 0, 2, 2}; // QEMU user-mode gateway, default target
+    if (ip_str[0] != '\0' && !parse_ipv4(ip_str, target_ip))
+    {
+        klog_error("ping: usage: ping [A.B.C.D] [count] (bad IP format)");
+        return;
+    }
+
+    uint32_t count = 4;
+    if (count_str[0] != '\0' && (!parse_uint(count_str, &count) || count == 0))
+    {
+        klog_error("ping: usage: ping [A.B.C.D] [count] (bad count)");
+        return;
+    }
+
+    // Same hardcoded local address as cmd_arptest -- no DHCP/static
+    // config yet (see the roadmap's IPv4 step). eth_init()/arp_init()
+    // are idempotent enough to call again here (they just re-cache
+    // the MAC / reset the ARP cache), so ping works standalone
+    // without requiring arptest to have run first.
+    uint8_t own_ip[4] = {10, 0, 2, 15};
+    eth_init();
+    arp_init(own_ip);
+    ipv4_init(own_ip);
+    uint8_t gateway_ip[4] = {10, 0, 2, 2}; // QEMU user-mode gateway -- see IPv4.h's header comment on routing scope
+    ipv4_set_gateway(gateway_ip);
+
+    klog_ok_prefix();
+    vga_puts("ping: sending ");
+    vga_putdec(count);
+    vga_puts(" ICMP echo request(s) to ");
+    vga_putdec(target_ip[0]);
+    vga_puts(".");
+    vga_putdec(target_ip[1]);
+    vga_puts(".");
+    vga_putdec(target_ip[2]);
+    vga_puts(".");
+    vga_putdec(target_ip[3]);
+    vga_puts("\n");
+
+    // Fixed 16-byte pattern payload -- standard ping tools use
+    // something similar (Linux's ping fills incrementing bytes),
+    // here just to have a non-empty, easily-recognizable echo body.
+    // Not used for timing: round-trip time is measured with
+    // pit_get_ticks() below, independent of payload content.
+    uint8_t payload[16];
+    for (int i = 0; i < 16; i++)
+        payload[i] = (uint8_t)i;
+
+    uint8_t rx_buffer[2048];
+    uint16_t identifier = 0xBEEF; // fixed per this ping run, distinguishes our own requests from anyone else's
+    uint32_t received = 0;
+
+    for (uint16_t seq = 0; seq < (uint16_t)count; seq++)
+    {
+        uint64_t send_tick = pit_get_ticks();
+
+        if (!icmp_send_echo_request(target_ip, identifier, seq, payload, sizeof(payload)))
+        {
+            klog_error_n("ping: seq failed to send", seq);
+            continue;
+        }
+
+        // 1-second reply timeout per request, same
+        // pit_get_ticks()-based pattern as arp_resolve() (see
+        // ARP.c) -- a fresh timeout window per sequence number
+        // rather than one shared budget for the whole run, so one
+        // slow reply doesn't eat into the next request's chance to
+        // be answered.
+        bool got_reply = false;
+        uint64_t timeout_ticks = 100; // 100 * 10ms = 1000ms
+
+        while (pit_get_ticks() - send_tick <= timeout_ticks)
+        {
+            icmp_echo_reply_t reply;
+            if (icmp_poll_receive(rx_buffer, &reply) &&
+                reply.identifier == identifier && reply.sequence == seq)
+            {
+                uint64_t rtt_ticks = pit_get_ticks() - send_tick;
+                klog_ok_prefix();
+                vga_puts("ping: reply from ");
+                vga_putdec(reply.src_ip[0]);
+                vga_puts(".");
+                vga_putdec(reply.src_ip[1]);
+                vga_puts(".");
+                vga_putdec(reply.src_ip[2]);
+                vga_puts(".");
+                vga_putdec(reply.src_ip[3]);
+                vga_puts(": seq=");
+                vga_putdec(seq);
+                vga_puts(" time=");
+                vga_putdec(rtt_ticks * 10); // ticks -> milliseconds (100Hz PIT, see Core/Time/PITCounter.h)
+                vga_puts("ms\n");
+                got_reply = true;
+                received++;
+                break;
+            }
+        }
+
+        if (!got_reply)
+        {
+            klog_warn_n("ping: seq timed out", seq);
+        }
+    }
+
+    klog_ok_prefix();
+    vga_puts("ping: ");
+    vga_putdec(received);
+    vga_puts("/");
+    vga_putdec(count);
+    vga_puts(" replies received\n");
+}
+
 // Draws two demo windows' worth of content once, right after
 // wm_create_window() -- content buffers start zeroed (see
 // WindowManager.c: kcalloc) and are only ever redrawn by whatever
@@ -329,4 +610,369 @@ void cmd_apexui(void)
         fb_clear(FB_RGB(0, 0, 0));
         fbcon_present_force();
     }
+}
+
+static uint32_t str_len_local(const char *s)
+{
+    uint32_t n = 0;
+    while (s[n])
+        n++;
+    return n;
+}
+
+// Encodes a hostname into DNS's length-prefixed label format (RFC
+// 1035 section 3.1) -- "example.com" becomes
+// {7}example{3}com{0}. Returns the number of bytes written, or 0 on
+// overflow/malformed input (empty label, e.g. "a..b" or a leading/
+// trailing dot -- rejected rather than silently producing a
+// malformed query the resolver would reject anyway).
+static uint32_t encode_dns_name(const char *hostname, uint8_t *out, uint32_t out_size)
+{
+    uint32_t out_pos = 0;
+    uint32_t label_start = 0;
+    uint32_t i = 0;
+    uint32_t len = str_len_local(hostname);
+
+    while (i <= len)
+    {
+        if (hostname[i] == '.' || hostname[i] == '\0')
+        {
+            uint32_t label_len = i - label_start;
+            if (label_len == 0 || label_len > 63 || out_pos + 1 + label_len >= out_size)
+                return 0;
+
+            out[out_pos++] = (uint8_t)label_len;
+            for (uint32_t j = 0; j < label_len; j++)
+                out[out_pos++] = (uint8_t)hostname[label_start + j];
+
+            label_start = i + 1;
+        }
+        i++;
+    }
+
+    if (out_pos >= out_size)
+        return 0;
+    out[out_pos++] = 0; // root label terminator
+
+    return out_pos;
+}
+
+// TEST TEMPORAIRE (réseau) -- see DiagnosticCommands.h's header
+// comment. Builds and sends a minimal RFC 1035 DNS query (header +
+// one question, type A / class IN) over Network/Protocols/UDP/UDP.c
+// to QEMU's user-mode built-in resolver, then parses just enough of
+// the reply to print the first A record found. Not a real DNS
+// client (no retries, no compression-pointer following in the
+// answer section beyond what's needed to skip over the echoed
+// question, no TCP fallback for truncated replies) -- exists purely
+// to exercise UDP send/receive end to end against a real peer, the
+// same role cmd_ping() played for ICMP.
+// klog_error() takes a single fixed string -- this wraps it so
+// resolve_hostname() can prefix its error messages with which
+// caller (cmd_dnstest vs cmd_tcptest) is doing the resolving,
+// without needing a real string-formatting facility in this
+// freestanding environment.
+static void log_error_labeled(const char *label, const char *message)
+{
+    klog_error_prefix();
+    vga_puts(label);
+    vga_puts(": ");
+    vga_puts(message);
+    vga_puts("\n");
+}
+
+// Resolves `hostname` to an IPv4 address via QEMU's user-mode
+// built-in DNS resolver (10.0.2.3) -- shared by cmd_dnstest() and
+// cmd_tcptest() so the query-building/reply-parsing logic (see this
+// function's body, extracted unchanged from what was originally
+// cmd_dnstest()'s own inline logic) isn't duplicated between the two
+// test commands. `label` is a short prefix for this call's log lines
+// (e.g. "dnstest" or "tcptest") so output makes sense regardless of
+// which command is doing the resolving.
+static bool resolve_hostname(const char *hostname, uint8_t out_ip[4], const char *label)
+{
+    uint8_t dns_server[4] = {10, 0, 2, 3}; // QEMU user-mode built-in DNS resolver
+
+    // --- Build the query ---
+    uint8_t query[512];
+    // Header (RFC 1035 section 4.1.1): ID, flags, QDCOUNT=1, rest 0.
+    uint16_t id = 0x1234;
+    query[0] = (uint8_t)(id >> 8);
+    query[1] = (uint8_t)id;
+    query[2] = 0x01; // flags high byte: RD (recursion desired) = 1, standard query
+    query[3] = 0x00; // flags low byte
+    query[4] = 0x00;
+    query[5] = 0x01; // QDCOUNT = 1
+    query[6] = 0x00;
+    query[7] = 0x00; // ANCOUNT = 0
+    query[8] = 0x00;
+    query[9] = 0x00; // NSCOUNT = 0
+    query[10] = 0x00;
+    query[11] = 0x00; // ARCOUNT = 0
+
+    uint32_t name_len = encode_dns_name(hostname, query + 12, sizeof(query) - 12 - 4);
+    if (name_len == 0)
+    {
+        log_error_labeled(label, "hostname too long or malformed");
+        return false;
+    }
+
+    uint32_t qtype_offset = 12 + name_len;
+    query[qtype_offset] = 0x00;
+    query[qtype_offset + 1] = 0x01; // QTYPE = A
+    query[qtype_offset + 2] = 0x00;
+    query[qtype_offset + 3] = 0x01; // QCLASS = IN
+
+    uint16_t query_len = (uint16_t)(qtype_offset + 4);
+
+    uint16_t src_port = 33333;
+    if (!udp_send(dns_server, 53, src_port, query, query_len))
+    {
+        log_error_labeled(label, "DNS udp_send failed");
+        return false;
+    }
+
+    // --- Wait for the reply ---
+    uint8_t rx_buffer[2048];
+    uint64_t start = pit_get_ticks();
+    uint64_t timeout_ticks = 200; // 2000ms, same budget as cmd_arptest's arp_resolve() call
+
+    while (pit_get_ticks() - start <= timeout_ticks)
+    {
+        udp_datagram_t datagram;
+        if (udp_poll_receive(rx_buffer, &datagram) && datagram.dest_port == src_port)
+        {
+            // --- Parse just enough of the reply ---
+            if (datagram.data_len < 12)
+            {
+                log_error_labeled(label, "DNS reply too short");
+                return false;
+            }
+
+            uint16_t ancount = ((uint16_t)datagram.data[6] << 8) | datagram.data[7];
+            if (ancount == 0)
+            {
+                log_error_labeled(label, "DNS: no answers (NXDOMAIN or empty response)");
+                return false;
+            }
+
+            // Skip the echoed question section: the name (each label
+            // length-prefixed, terminated by a 0 byte -- assumed
+            // uncompressed here since it's the exact name we just
+            // sent, never a pointer) + QTYPE + QCLASS (4 bytes).
+            uint32_t pos = 12;
+            while (pos < datagram.data_len && datagram.data[pos] != 0)
+                pos += datagram.data[pos] + 1;
+            pos += 1 + 4; // root label byte + QTYPE + QCLASS
+
+            // Each answer record: NAME (a compression pointer, 2
+            // bytes, in every real-world reply) + TYPE(2) + CLASS(2)
+            // + TTL(4) + RDLENGTH(2) + RDATA. Only the first answer
+            // is examined, and only if it's an A record (RDLENGTH 4,
+            // TYPE 1) -- good enough for this test's purpose (see
+            // this function's header comment on scope); a CNAME
+            // chain before the A record would need more parsing than
+            // this test bothers with.
+            if (pos + 12 > datagram.data_len)
+            {
+                log_error_labeled(label, "DNS reply truncated before first answer");
+                return false;
+            }
+
+            uint16_t rtype = ((uint16_t)datagram.data[pos + 2] << 8) | datagram.data[pos + 3];
+            uint16_t rdlength = ((uint16_t)datagram.data[pos + 10] << 8) | datagram.data[pos + 11];
+
+            if (rtype != 1 || rdlength != 4)
+            {
+                log_error_labeled(label, "DNS: first answer isn't a plain A record (got a CNAME first?)");
+                return false;
+            }
+
+            const uint8_t *addr = datagram.data + pos + 12;
+            for (int i = 0; i < 4; i++)
+                out_ip[i] = addr[i];
+            return true;
+        }
+    }
+
+    log_error_labeled(label, "DNS timed out -- no reply received");
+    return false;
+}
+
+void cmd_dnstest(const char *args)
+{
+    const char *hostname = (args[0] != '\0') ? args : "example.com";
+
+    uint8_t own_ip[4] = {10, 0, 2, 15};
+    eth_init();
+    arp_init(own_ip);
+    ipv4_init(own_ip);
+    uint8_t gateway_ip[4] = {10, 0, 2, 2}; // QEMU user-mode gateway -- see IPv4.h's header comment on routing scope
+    ipv4_set_gateway(gateway_ip);
+
+    klog_ok_prefix();
+    vga_puts("dnstest: querying ");
+    vga_puts(hostname);
+    vga_puts(" via 10.0.2.3...\n");
+
+    uint8_t resolved_ip[4];
+    if (!resolve_hostname(hostname, resolved_ip, "dnstest"))
+        return;
+
+    klog_ok_prefix();
+    vga_puts("dnstest: ");
+    vga_puts(hostname);
+    vga_puts(" = ");
+    vga_putdec(resolved_ip[0]);
+    vga_puts(".");
+    vga_putdec(resolved_ip[1]);
+    vga_puts(".");
+    vga_putdec(resolved_ip[2]);
+    vga_puts(".");
+    vga_putdec(resolved_ip[3]);
+    vga_puts("\n");
+}
+
+// Prints up to `len` bytes as raw text -- used to dump whatever an
+// HTTP server sends back in cmd_tcptest(). vga_puts() expects a
+// null-terminated C string, but HTTP response bodies/headers aren't
+// guaranteed to be null-terminated (and may not even be safely
+// printable, e.g. embedded binary in a non-text response) -- this
+// copies through a small fixed chunk buffer, always null-terminating
+// each chunk, rather than assuming the whole buffer is one safe
+// string.
+static void print_raw_bytes(const uint8_t *data, uint16_t len)
+{
+    char chunk[128];
+    uint16_t pos = 0;
+    while (pos < len)
+    {
+        uint16_t chunk_len = (uint16_t)(len - pos);
+        if (chunk_len > sizeof(chunk) - 1)
+            chunk_len = sizeof(chunk) - 1;
+        for (uint16_t i = 0; i < chunk_len; i++)
+            chunk[i] = (char)data[pos + i];
+        chunk[chunk_len] = '\0';
+        vga_puts(chunk);
+        pos += chunk_len;
+    }
+}
+
+void cmd_tcptest(const char *args)
+{
+    const char *hostname = (args[0] != '\0') ? args : "example.com";
+
+    uint8_t own_ip[4] = {10, 0, 2, 15};
+    eth_init();
+    arp_init(own_ip);
+    ipv4_init(own_ip);
+    uint8_t gateway_ip[4] = {10, 0, 2, 2}; // QEMU user-mode gateway -- see IPv4.h's header comment on routing scope
+    ipv4_set_gateway(gateway_ip);
+    tcp_init();
+
+    klog_ok_prefix();
+    vga_puts("tcptest: resolving ");
+    vga_puts(hostname);
+    vga_puts("...\n");
+
+    uint8_t server_ip[4];
+    if (!resolve_hostname(hostname, server_ip, "tcptest"))
+        return;
+
+    klog_ok_prefix();
+    vga_puts("tcptest: connecting to ");
+    vga_putdec(server_ip[0]);
+    vga_puts(".");
+    vga_putdec(server_ip[1]);
+    vga_puts(".");
+    vga_putdec(server_ip[2]);
+    vga_puts(".");
+    vga_putdec(server_ip[3]);
+    vga_puts(":80...\n");
+
+    uint16_t src_port = 44444;
+    if (!tcp_connect(server_ip, 80, src_port, 3000))
+    {
+        klog_error("tcptest: connection failed (timeout or refused)");
+        return;
+    }
+
+    klog_ok_prefix();
+    vga_puts("tcptest: connected (handshake complete)\n");
+
+    // Minimal HTTP/1.1 GET -- "Connection: close" so the server ends
+    // the TCP connection itself once the response is fully sent
+    // (rather than this test needing to know the response's
+    // Content-Length or handle chunked transfer-encoding to know
+    // when to stop reading -- simplest correct way to know "the
+    // response is over" for a throwaway test, see this function's
+    // header comment on scope). "Host" is required for HTTP/1.1
+    // (RFC 7230) -- most real-world servers reject a request without
+    // it, including virtual-hosted ones.
+    char request[256];
+    uint32_t req_len = 0;
+    const char *parts[] = {"GET / HTTP/1.1\r\nHost: ", hostname,
+                           "\r\nConnection: close\r\n\r\n"};
+    for (int p = 0; p < 3; p++)
+    {
+        uint32_t part_len = str_len_local(parts[p]);
+        for (uint32_t i = 0; i < part_len && req_len < sizeof(request) - 1; i++)
+            request[req_len++] = parts[p][i];
+    }
+
+    if (!tcp_send(request, (uint16_t)req_len))
+    {
+        klog_error("tcptest: failed to send HTTP request");
+        tcp_close(1000);
+        return;
+    }
+
+    klog_ok_prefix();
+    vga_puts("tcptest: request sent, reading response...\n\n");
+
+    uint8_t scratch_buffer[2048];
+    uint8_t data_buffer[1024];
+    uint64_t start = pit_get_ticks();
+    uint64_t timeout_ticks = 300; // 3000ms overall budget for the whole response
+    uint32_t total_received = 0;
+
+    while (pit_get_ticks() - start <= timeout_ticks)
+    {
+        if (tcp_get_state() == TCP_STATE_CLOSED_BY_PEER)
+            break; // server sent FIN -- "Connection: close" means this is expected, not an error
+
+        uint16_t received = tcp_poll_receive(scratch_buffer, data_buffer, sizeof(data_buffer));
+        if (received > 0)
+        {
+            print_raw_bytes(data_buffer, received);
+            total_received += received;
+            start = pit_get_ticks(); // reset the idle timeout each time data actually arrives
+        }
+    }
+
+    vga_puts("\n");
+    klog_ok_prefix();
+    vga_puts("tcptest: ");
+    vga_putdec(total_received);
+    vga_puts(" bytes received, closing connection\n");
+
+    tcp_close(1000);
+}
+
+void cmd_serialmirror(const char *args)
+{
+    if (str_eq(args, "on"))
+    {
+        vga_set_serial_mirror(true);
+        klog_ok_prefix();
+        vga_puts("serialmirror: enabled -- screen output now mirrored to COM1\n");
+    }
+    else if (str_eq(args, "off"))
+    {
+        vga_set_serial_mirror(false);
+        klog_ok_prefix();
+        vga_puts("serialmirror: disabled\n");
+    }
+    else
+        klog_error("serialmirror: usage: serialmirror on|off");
 }

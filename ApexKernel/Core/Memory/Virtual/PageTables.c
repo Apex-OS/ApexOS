@@ -5,8 +5,20 @@
 #include "Core/Memory/Physical/PageBitmap.h"
 
 // Kernel PML4, set up by stage2 at boot (see
-// ApexKernel/Boot/BIOS/Stage2.asm).
+// ApexKernel/Boot/BIOS/Stage2.asm). During vmm_init()'s initial
+// identity-map build, this is redirected to SCRATCH_PML4 instead --
+// see building_scratch_pml4's declaration in PageTables.h and
+// vmm_init()'s comment in IdentityMap.c for why.
 static uint64_t *pml4 = (uint64_t *)KERNEL_PML4;
+bool building_scratch_pml4 = false;
+
+// Returns whichever PML4 is currently the target for new mappings --
+// KERNEL_PML4 normally, or SCRATCH_PML4 while vmm_init() is building
+// the initial map into it (see building_scratch_pml4's declaration).
+static inline uint64_t *active_pml4(void)
+{
+    return building_scratch_pml4 ? (uint64_t *)SCRATCH_PML4 : pml4;
+}
 
 // Returns the child table at `table[idx]`, allocating and
 // zero-initializing it first if not already present.
@@ -42,7 +54,7 @@ void vmm_map(uint64_t virt, uint64_t phys, uint64_t flags)
     if (flags & VMM_USER)
         table_flags |= VMM_USER;
 
-    uint64_t *pdpt = vmm_get_or_create(pml4, PML4_IDX(virt), table_flags);
+    uint64_t *pdpt = vmm_get_or_create(active_pml4(), PML4_IDX(virt), table_flags);
     if (!pdpt)
         return;
 

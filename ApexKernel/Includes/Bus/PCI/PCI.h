@@ -61,4 +61,12 @@ void pci_config_write32(uint8_t bus, uint8_t slot, uint8_t function, uint8_t off
 // 0xFF to match any prog_if within the given class/subclass.
 bool pci_find_device(uint8_t class_code, uint8_t subclass, uint8_t prog_if, pci_device_t *out);
 
+// Same brute-force scan as pci_find_device(), but matching on exact
+// vendor_id/device_id instead of class/subclass -- what a driver for
+// one specific chip (e.g. Drivers/Network/E1000/, matching Intel
+// 0x8086 / 82540EM 0x100E) needs rather than "any device in this
+// class", since several unrelated chips can share a class/subclass
+// (e.g. many different NICs are all class=0x02 subclass=0x00).
+bool pci_find_device_by_id(uint16_t vendor_id, uint16_t device_id, pci_device_t *out);
+
 #endif // APEX_BUS_PCI_H

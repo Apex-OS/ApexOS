@@ -113,3 +113,41 @@ bool pci_find_device(uint8_t class_code, uint8_t subclass, uint8_t prog_if, pci_
 
     return false;
 }
+
+bool pci_find_device_by_id(uint16_t vendor_id, uint16_t device_id, pci_device_t *out)
+{
+    // Same scan as pci_find_device() above, matching vendor_id/
+    // device_id instead of class/subclass -- see PCI.h's comment on
+    // why a specific-chip driver needs this rather than a class-based
+    // search.
+    for (uint16_t bus = 0; bus < 256; bus++)
+    {
+        for (uint8_t slot = 0; slot < 32; slot++)
+        {
+            uint16_t vendor = pci_read_vendor_id((uint8_t)bus, slot, 0);
+            if (vendor == 0xFFFF)
+                continue;
+
+            uint32_t reg3 = pci_config_read32((uint8_t)bus, slot, 0, 0x0C);
+            bool multi_function = (reg3 & 0x00800000) != 0;
+            uint8_t max_function = multi_function ? 8 : 1;
+
+            for (uint8_t function = 0; function < max_function; function++)
+            {
+                if (pci_read_vendor_id((uint8_t)bus, slot, function) == 0xFFFF)
+                    continue;
+
+                pci_device_t dev;
+                pci_read_device((uint8_t)bus, slot, function, &dev);
+
+                if (dev.vendor_id == vendor_id && dev.device_id == device_id)
+                {
+                    *out = dev;
+                    return true;
+                }
+            }
+        }
+    }
+
+    return false;
+}
