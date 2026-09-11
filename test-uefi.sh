@@ -64,5 +64,11 @@ qemu-system-x86_64 \
   -M q35 \
   -drive if=pflash,format=raw,readonly=on,file=OVMF_CODE_4M.fd \
   -drive if=pflash,format=raw,file=OVMF_VARS_4M.fd \
-  -drive file=test_uefi.img,format=raw,if=ide \
-  -m 256M
+  -drive file=test_uefi.img,format=raw,index=0,media=disk \
+  -m 256M \
+  -netdev user,id=net0 \
+  -device e1000,netdev=net0 \
+  -serial stdio \
+  -no-reboot \
+  -no-shutdown \
+  -display sdl
