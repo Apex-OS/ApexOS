@@ -11,6 +11,7 @@
 #include "Core/Shell/CommandDispatcher.h"
 #include "Core/Shell/Prompt.h"
 #include "Core/Shell/History.h"
+#include "Core/Version.h"
 #include "Drivers/Display/VGA.h"
 #include "Drivers/Input/Keyboard/Keyboard.h"
 #include "Drivers/Input/Keyboard/KeyBuffer.h"
@@ -37,7 +38,7 @@ void shell_init(void)
     vga_puts("/_/  |_/ .___/\\___/_/|_/\\____//____/  \n");
     vga_puts("      /_/                             \n");
     vga_set_color(VGA_WHITE, VGA_BLACK);
-    vga_puts("  ApexOS v0.0.1 - Type 'help'\n\n");
+    vga_puts("      ApexOS v" APEXOS_VERSION " - Type 'help'\n\n");
 
     shell_print_prompt();
 }

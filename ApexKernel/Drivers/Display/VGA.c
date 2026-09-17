@@ -8,6 +8,7 @@
 #include "Drivers/Display/Console/ConsoleCore.h"
 #include "Drivers/Display/Console/ConsoleCursor.h"
 #include "Drivers/Display/Console/ConsoleScrollback.h"
+#include "Drivers/Display/Console/ConsoleRender.h"
 
 // Set once by vga_enable_graphics_mode() (called from Core/Init.c
 // after fb_init() succeeds) -- every public function below checks
@@ -45,6 +46,15 @@ void vga_enable_graphics_mode(void)
 {
     graphics_mode = true;
     fbcon_init();
+    // Brings every line printed so far (real VGA text mode, about to
+    // stop being read at all now that graphics_mode is true) into
+    // this console's own scrollback -- otherwise it's gone the
+    // instant fbcon_present() first draws over the physical screen,
+    // not just off-screen but nowhere left to scroll back to either.
+    // Must run after fbcon_init() above, which calls fbcon_clear() --
+    // doing this first would just get wiped by that.
+    fbcon_import_scrollback();
+    fbcon_present();
 }
 
 bool vga_is_graphics_mode(void)
@@ -432,4 +442,30 @@ void vga_end_batch(void)
 {
     if (graphics_mode)
         fbcon_end_batch();
+}
+
+uint32_t vga_get_scrollback_line_count(void)
+{
+    return total_lines;
+}
+
+bool vga_get_scrollback_cell(uint32_t line, uint32_t col, char *out_c, uint8_t *out_attr)
+{
+    if (line >= total_lines)
+        return false;
+    if (col >= VGA_WIDTH)
+        return false;
+
+    // Oldest line still physically present in the ring buffer -- see
+    // this function's declaration in VGA.h for why lines older than
+    // this are simply unavailable, not an error condition to handle
+    // specially here.
+    uint32_t oldest_available = (total_lines > SCROLLBACK_LINES) ? (total_lines - SCROLLBACK_LINES) : 0;
+    if (line < oldest_available)
+        return false;
+
+    uint16_t entry = scrollback[line % SCROLLBACK_LINES][col];
+    *out_c = (char)(entry & 0xFF);
+    *out_attr = (uint8_t)(entry >> 8);
+    return true;
 }

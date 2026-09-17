@@ -25,6 +25,7 @@ echo "== Re-launching QEMU + OVMF (no rebuild, reusing existing test_uefi.img) =
 
 qemu-system-x86_64 \
   -M q35 \
+  -smp 4 \
   -drive if=pflash,format=raw,readonly=on,file=OVMF_CODE_4M.fd \
   -drive if=pflash,format=raw,file=OVMF_VARS_4M.fd \
   -drive file=test_uefi.img,format=raw,index=0,media=disk \

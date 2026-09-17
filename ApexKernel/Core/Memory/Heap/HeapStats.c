@@ -3,8 +3,7 @@
 
 #include "Core/Memory/Heap/HeapStats.h"
 #include "Core/Memory/Heap/HeapInternal.h"
-#include "Drivers/Display/VGA.h"
-#include "Logs/Log.h"
+#include "Core/Boot/Log/BootLog.h"
 
 void heap_print_stats(void)
 {
@@ -22,14 +21,20 @@ void heap_print_stats(void)
         blocks++;
         block = block->next;
     }
-    klog_ok_prefix();
-    vga_puts("Heap initialized - Size: ");
-    vga_putdec(heap_size / 1024);
-    vga_puts("KB  Free: ");
-    vga_putdec(free_bytes / 1024);
-    vga_puts("KB  Used: ");
-    vga_putdec(used_bytes / 1024);
-    vga_puts("KB  Blocks: ");
-    vga_putdec(blocks);
-    vga_puts("\n");
+
+    boot_log_start();
+    boot_log_str("Heap: ");
+    boot_log_dec(heap_size / 1024);
+    boot_log_str("KB total, ");
+    boot_log_dec(blocks);
+    boot_log_str(" block(s)");
+    boot_log_end_ok();
+
+    boot_log_start();
+    boot_log_str("Heap: ");
+    boot_log_dec(free_bytes / 1024);
+    boot_log_str("KB free, ");
+    boot_log_dec(used_bytes / 1024);
+    boot_log_str("KB used");
+    boot_log_end_ok();
 }

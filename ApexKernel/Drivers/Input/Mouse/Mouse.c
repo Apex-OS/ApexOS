@@ -6,7 +6,7 @@
 #include "Drivers/Input/Mouse/PS2Port.h"
 #include "Drivers/Display/VGA.h"
 #include "Bus/PortIO.h"
-#include "Logs/Log.h"
+#include "Core/Boot/Log/BootLog.h"
 
 static uint8_t packet[4];
 static uint8_t packet_index = 0;
@@ -90,9 +90,9 @@ void mouse_init(void)
     mouse_read(); // ACK
 
     if (has_wheel)
-        klog_ok("PS/2 mouse initialized (wheel supported)");
+        boot_log_ok("PS/2 mouse initialized (wheel supported)");
     else
-        klog_warn("PS/2 mouse: no wheel detected");
+        boot_log_warn("PS/2 mouse: no wheel detected");
 
     packet_index = 0;
 }
@@ -146,8 +146,8 @@ void mouse_handler(void)
         // positive going DOWN (row 0 = top) -- flipped here so
         // "moving the mouse up" moves the cursor up on screen, not
         // down.
-        state.x += delta_x;
-        state.y -= delta_y;
+        state.x -= delta_x;
+        state.y += delta_y;
 
         if (state.x < 0)
             state.x = 0;

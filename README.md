@@ -4,7 +4,7 @@
 
 ApexOS aims to be lightweight like Linux, powerful like Windows, with a modern, customizable look and a kernel built around a few genuinely new ideas rather than just re-implementing what already exists.
 
-**Current version: `v0.1.0`**
+**Current version: `v0.1.5`**
 
 ## What's working right now
 

@@ -58,9 +58,21 @@ BOOT_DIR  := ApexKernel/Boot/BIOS
 # under these trees is picked up automatically on the next `make`, no
 # manual list to maintain. Excludes Includes/ (headers only, no .c there
 # anyway) implicitly since find only matches *.c/*.asm.
+#
+# ApexKernel/Boot/UEFI is excluded here even though it lives under
+# ApexKernel/ -- those files (Main.c/efi_main and friends) are PE32+
+# code built separately by test-uefi.sh with x86_64-w64-mingw32-gcc,
+# not this freestanding-ELF kernel build. Without this exclusion they
+# were being silently swept into kernel.elf by this same `find` (bug
+# found while adding AcpiFind.c: it showed up in this Makefile's own
+# `make all` output, which is what caught that Main.c/GraphicsSetup.c/
+# KernelLoad.c/GptReader.c/MemoryMapConvert.c had already been doing
+# the same thing unnoticed -- harmless so far only because none of
+# them happened to collide with a kernel symbol, not because it was
+# ever correct).
 SRC_DIRS  := ApexKernel ApexLib ApexUI Tests
 
-C_SRCS    := $(shell find $(SRC_DIRS) -name '*.c' | sort)
+C_SRCS    := $(shell find $(SRC_DIRS) -name '*.c' -not -path 'ApexKernel/Boot/UEFI/*' | sort)
 ASM_SRCS  := $(shell find ApexKernel/Arch -name '*.asm' | sort)
 
 # ── Object files ───────────────────────────────────────────────────────────
@@ -134,6 +146,7 @@ run: all
 	@echo "  QEMU    Launching ApexOS..."
 	@qemu-system-x86_64              \
 		-M q35                       \
+		-smp 4                       \
 		-drive file=$(BUILD)/apex.img,format=raw,index=0,media=disk \
 		-m 256M                      \
 		-netdev user,id=net0         \

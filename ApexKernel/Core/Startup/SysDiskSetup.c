@@ -6,7 +6,7 @@
 #include "Core/Boot/DiskLayout.h"
 #include "Drivers/Storage/AHCI/AHCI.h"
 #include "Filesystem/VFS/VolumeRegistry.h"
-#include "Logs/Log.h"
+#include "Core/Boot/Log/BootLog.h"
 
 axfs_volume_t *core_setup_sysdisk(void)
 {
@@ -35,7 +35,7 @@ axfs_volume_t *core_setup_sysdisk(void)
     if (disk_layout->valid)
     {
         sysdisk_start_sector = disk_layout->sysdisk_start_lba;
-        klog_ok_n("SysDisk: starting after UEFI ESP at sector", sysdisk_start_sector);
+        boot_log_ok_n("SysDisk: starting after UEFI ESP at sector", sysdisk_start_sector);
     }
     else
     {
@@ -97,7 +97,7 @@ axfs_volume_t *core_setup_sysdisk(void)
         // message that actually explains what's happening and why, for
         // anyone reading the boot log without already knowing AXFS's
         // internals.
-        klog_info("SysDisk: no filesystem found, formatting now...");
+        boot_log_info("SysDisk: no filesystem found, formatting now...");
         if (!axfs_format(&sysdisk_vol, "SysDisk") || !axfs_mount(&sysdisk_vol))
             kpanic("kernel: could not format/mount SysDisk");
 

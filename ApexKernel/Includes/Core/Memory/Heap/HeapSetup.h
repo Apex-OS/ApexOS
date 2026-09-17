@@ -30,8 +30,34 @@
 // to draw fresh page-table pages from removes the overlap entirely:
 // the heap's virtual range and the physical pages used as page tables
 // no longer share the same address space.
-#define HEAP_START 0x4000000   // 64MB
-#define HEAP_MAX_SIZE 0x600000 // 6MB
+#define HEAP_START 0x4000000    // 64MB
+#define HEAP_MAX_SIZE 0x1000000 // 16MB -- raised from 6MB: boot-time
+                                // usage reached ~5.6MB/6MB (94%) once
+                                // SMP bring-up (Core/SMP/) added AP
+                                // stacks, per-CPU storage, and its own
+                                // test allocations on top of AXFS/
+                                // framebuffer/network's existing
+                                // usage, leaving too little headroom
+                                // for ApexUI's own window content
+                                // buffers (Core/Shell/Commands/
+                                // DiagnosticCommands.c's cmd_apexui(),
+                                // ~380KB for two demo windows) to
+                                // allocate -- confirmed via
+                                // heap_print_stats()'s own boot-log
+                                // line showing "406KB free" right
+                                // before ApexUI's kcalloc() calls
+                                // failed. 16MB leaves ample headroom
+                                // (well within the 255MB this kernel
+                                // has been tested against) without
+                                // needing to revisit this again soon.
+                                // Still well clear of the low-memory
+                                // page-table collision this constant's
+                                // own history describes above (see
+                                // HEAP_START's comment) -- that issue
+                                // was about virtual address overlap,
+                                // not the size itself, and this
+                                // remains far from the kernel's own
+                                // low-memory identity-mapped range.
 
 void heap_init(void);
 

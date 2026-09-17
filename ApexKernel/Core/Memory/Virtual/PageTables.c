@@ -3,6 +3,7 @@
 
 #include "Core/Memory/Virtual/PageTables.h"
 #include "Core/Memory/Physical/PageBitmap.h"
+#include "Core/SMP/TLB/TlbShootdown.h"
 
 // Kernel PML4, set up by stage2 at boot (see
 // ApexKernel/Boot/BIOS/Stage2.asm). During vmm_init()'s initial
@@ -69,6 +70,17 @@ void vmm_map(uint64_t virt, uint64_t phys, uint64_t flags)
     pt[PT_IDX(virt)] = (phys & 0x000FFFFFFFFFF000ULL) | flags;
 
     __asm__ volatile("invlpg (%0)" ::"r"(virt) : "memory");
+}
+
+void vmm_map_and_shootdown(uint64_t virt, uint64_t phys, uint64_t flags)
+{
+    vmm_map(virt, phys, flags);
+
+    // See PageTables.h's own comment on vmm_map_and_shootdown() for
+    // why this broadcast is needed here specifically -- vmm_map()
+    // above already invalidated THIS CPU's own TLB, this covers
+    // every other one.
+    tlb_shootdown(virt);
 }
 
 void vmm_unmap(uint64_t virt)

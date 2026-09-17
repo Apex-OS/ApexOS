@@ -7,7 +7,7 @@
 #include "Core/Memory/Physical/PageBitmap.h"
 #include "Core/Memory/Heap/Heap.h"
 #include "Arch/x86_64/MTRR.h"
-#include "Logs/Log.h"
+#include "Core/Boot/Log/BootLog.h"
 
 bool fb_init(void)
 {
@@ -15,7 +15,7 @@ bool fb_init(void)
 
     if (!boot_info->valid)
     {
-        klog_warn("fb_init: no suitable VBE mode found at boot -- staying in VGA text mode");
+        boot_log_warn("fb_init: no suitable VBE mode found at boot -- staying in VGA text mode");
         return false;
     }
 
@@ -48,7 +48,7 @@ bool fb_init(void)
     // fails (older CPU, no free MTRR register, etc.) -- the
     // framebuffer keeps working at whatever memory type the
     // firmware/vmm_map() left it at (see mtrr_set_range()'s own
-    // klog_warn for why, if it happens).
+    // boot_log_warn for why, if it happens).
     mtrr_set_range(phys_base, total_bytes, MTRR_TYPE_WC);
 
     g_fb.addr = (uint32_t *)phys_base;
@@ -68,14 +68,14 @@ bool fb_init(void)
     g_backbuffer = (uint32_t *)kmalloc(backbuffer_bytes);
     if (!g_backbuffer)
     {
-        klog_error("fb_init: kmalloc failed for back-buffer -- staying in VGA text mode");
+        boot_log_error("fb_init: kmalloc failed for back-buffer -- staying in VGA text mode");
         return false;
     }
 
     g_fb_ready = true;
 
-    klog_ok_n("fb_init: framebuffer ready, width", g_fb.width);
-    klog_ok_n("fb_init: framebuffer ready, height", g_fb.height);
+    boot_log_ok_n("fb_init: framebuffer ready, width", g_fb.width);
+    boot_log_ok_n("fb_init: framebuffer ready, height", g_fb.height);
 
     return true;
 }

@@ -4,12 +4,18 @@
 #include "Core/Interrupts/Handlers/InterruptDispatch.h"
 #include "Core/Interrupts/Exceptions/ExceptionReport.h"
 #include "Core/Interrupts/IRQ/IRQDispatch.h"
+#include "Core/SMP/IPI/Ipi.h"
+#include "Core/SMP/TLB/TlbShootdown.h"
 
 // Main C handler -- called by every stub in Interrupts.asm.
 void interrupt_handler(interrupt_frame_t *frame)
 {
     if (frame->int_no < 32)
         exception_report(frame);
+    else if (frame->int_no == IPI_VECTOR)
+        ipi_dispatch(frame);
+    else if (frame->int_no == TLB_SHOOTDOWN_VECTOR)
+        tlb_shootdown_dispatch();
     else
         irq_dispatch(frame);
 }

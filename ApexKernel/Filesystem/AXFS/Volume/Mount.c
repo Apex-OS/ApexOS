@@ -3,14 +3,14 @@
 
 #include "Filesystem/AXFS/AXFS.h"
 #include "Drivers/Display/VGA.h"
-#include "Logs/Log.h"
+#include "Core/Boot/Log/BootLog.h"
 
 bool axfs_mount(axfs_volume_t *vol)
 {
     axfs_superblock_t sb;
     if (!axfs_disk_read_block(&vol->disk, 0, &sb))
     {
-        klog_error("axfs_mount: could not read superblock");
+        boot_log_error("axfs_mount: could not read superblock");
         return false;
     }
 
@@ -31,7 +31,7 @@ bool axfs_mount(axfs_volume_t *vol)
 
     if (sb.version != AXFS_VERSION)
     {
-        klog_error("axfs_mount: unsupported version");
+        boot_log_error("axfs_mount: unsupported version");
         return false;
     }
 
@@ -56,23 +56,24 @@ bool axfs_mount(axfs_volume_t *vol)
     // is future work, not attempted here.
     if (sb.journal_start_block == 0)
     {
-        klog_warn("axfs_mount: volume has no journal region (formatted before journaling existed) -- writes to this volume are not crash-protected until it's reformatted");
+        boot_log_warn("axfs_mount: volume has no journal region (formatted before journaling existed) -- writes to this volume are not crash-protected until it's reformatted");
     }
     else
     {
         axfs_journal_recover(vol);
     }
 
-    klog_ok_prefix();
-    vga_puts("AXFS mounted: \"");
-    vga_puts(sb.volume_label);
-    vga_puts("\" (");
-    vga_putdec(sb.free_inodes);
-    vga_puts("/");
-    vga_putdec(sb.total_inodes);
-    vga_puts(" inodes free, ");
-    vga_putdec(sb.free_blocks);
-    vga_puts(" data blocks free)\n");
+    boot_log_start();
+    boot_log_str("AXFS mounted: \"");
+    boot_log_str(sb.volume_label);
+    boot_log_str("\" (");
+    boot_log_dec(sb.free_inodes);
+    boot_log_str("/");
+    boot_log_dec(sb.total_inodes);
+    boot_log_str(" inodes free, ");
+    boot_log_dec(sb.free_blocks);
+    boot_log_str(" data blocks free)");
+    boot_log_end_ok();
 
     return true;
 }

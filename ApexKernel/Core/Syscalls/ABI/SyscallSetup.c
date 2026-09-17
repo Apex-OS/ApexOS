@@ -2,7 +2,7 @@
 // ApexOS -- Syscall MSR configuration (syscall/sysret enablement)
 
 #include "Core/Syscalls/ABI/SyscallSetup.h"
-#include "Logs/Log.h"
+#include "Core/Boot/Log/BootLog.h"
 
 #define MSR_EFER 0xC0000080
 #define MSR_STAR 0xC0000081
@@ -44,5 +44,5 @@ void syscall_init(void)
     // SFMASK: RFLAGS mask applied on syscall entry (clears IF).
     wrmsr(MSR_SFMASK, (1 << 9)); // masks IF
 
-    klog_ok("Syscalls initialized (syscall/sysret)");
+    boot_log_ok("Syscalls initialized (syscall/sysret)");
 }

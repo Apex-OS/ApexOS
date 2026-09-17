@@ -5,7 +5,7 @@
 #include "Filesystem/AXFS/AXFS.h"
 #include "Core/Memory/Heap/Heap.h"
 #include "Drivers/Display/VGA.h"
-#include "Logs/Log.h"
+#include "Core/Boot/Log/BootLog.h"
 
 bool axfs_disk_init_ram(axfs_disk_t *disk, uint64_t size_bytes)
 {
@@ -15,7 +15,7 @@ bool axfs_disk_init_ram(axfs_disk_t *disk, uint64_t size_bytes)
     uint8_t *buffer = (uint8_t *)kmalloc(total_bytes);
     if (!buffer)
     {
-        klog_error("axfs_disk_init_ram: kmalloc failed");
+        boot_log_error("axfs_disk_init_ram: kmalloc failed");
         return false;
     }
 
@@ -31,12 +31,13 @@ bool axfs_disk_init_ram(axfs_disk_t *disk, uint64_t size_bytes)
     disk->ahci_start_lba = 0;
     disk->ahci_total_blocks = 0;
 
-    klog_ok_prefix();
-    vga_puts("AXFS RAM disk initialized (");
-    vga_putdec(total_bytes / (1024 * 1024));
-    vga_puts(" MB, ");
-    vga_putdec(blocks);
-    vga_puts(" blocks)\n");
+    boot_log_start();
+    boot_log_str("AXFS RAM disk initialized (");
+    boot_log_dec(total_bytes / (1024 * 1024));
+    boot_log_str(" MB, ");
+    boot_log_dec(blocks);
+    boot_log_str(" blocks)");
+    boot_log_end_ok();
 
     return true;
 }

@@ -25,17 +25,25 @@
 //      position (Core/Startup/SysDiskSetup.c) can no longer be a
 //      fixed hardcoded sector: it now shares a real disk with a real
 //      ESP partition whose size isn't known until boot time.
-//   4. MemoryMapConvert.c: get the memory map and convert it to this
+//   4. AcpiFind.c: locate the ACPI RSDP via the firmware's
+//      configuration table, written to ACPI_INFO_ADDR (0x9500) --
+//      see Core/Acpi/Madt.c, which parses it (RSDT/XSDT -> MADT) for
+//      SMP CPU discovery. On a BIOS boot the same acpi_info_t is
+//      instead filled by the kernel itself scanning low memory
+//      directly (see Core/Acpi/RsdpFind.c) -- UEFI firmware doesn't
+//      leave the RSDP at a fixed scannable address the way BIOS does,
+//      it must be asked for via this configuration table.
+//   5. MemoryMapConvert.c: get the memory map and convert it to this
 //      kernel's existing E820 entry format at MMAP_ADDR/
 //      MMAP_COUNT_ADDR (0x9600/0x95FC) -- Core/Memory/MemoryMap/
 //      MemoryMap.c already reads from there regardless of who wrote
 //      it.
-//   5. ExitBootServices() using the map key from step 4's call --
+//   6. ExitBootServices() using the map key from step 5's call --
 //      must be the *same* GetMemoryMap() call's key, so nothing
-//      between step 4 and this call may allocate/free (which would
+//      between step 5 and this call may allocate/free (which would
 //      change the map and invalidate the key -- see the retry loop
 //      below for how this is enforced).
-//   6. Jump to the kernel at 0x100000. No page table setup needed
+//   7. Jump to the kernel at 0x100000. No page table setup needed
 //      here (unlike the BIOS path's setup_paging) -- UEFI leaves CR3
 //      pointing at an identity-mapped-for-low-memory page table on
 //      x86_64, which survives ExitBootServices() and already covers
@@ -51,6 +59,7 @@
 #include "Boot/UEFI/KernelLoad.h"
 #include "Boot/UEFI/GptReader.h"
 #include "Boot/UEFI/MemoryMapConvert.h"
+#include "Boot/UEFI/AcpiFind.h"
 
 static CHAR16 msg_gop_fail[] = {'[', 'E', 'R', 'R', ']', ' ', 'G', 'O', 'P', ' ',
                                 'n', 'o', 't', ' ', 'f', 'o', 'u', 'n', 'd', '\r', '\n', 0};
@@ -90,6 +99,22 @@ EFI_STATUS efi_main(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *system_table)
     {
         disk_layout->sysdisk_start_lba = esp_end_lba + 1;
         disk_layout->valid = 1;
+    }
+
+    // ── ACPI RSDP (for SMP CPU discovery via MADT) ──────────────────
+    // Non-fatal if this fails, same reasoning as disk_layout above --
+    // see Core/Acpi/Madt.c: no RSDP means the kernel just proceeds
+    // with a single detected CPU (this one, already running) instead
+    // of enumerating APs to wake.
+    acpi_info_t *acpi_info = (acpi_info_t *)(uint64_t)ACPI_INFO_ADDR;
+    acpi_info->rsdp_addr = 0;
+    acpi_info->valid = 0;
+
+    uint64_t rsdp_addr = 0;
+    if (find_acpi_rsdp(system_table, &rsdp_addr))
+    {
+        acpi_info->rsdp_addr = rsdp_addr;
+        acpi_info->valid = 1;
     }
 
     // ── Memory map + ExitBootServices ───────────────────────────────

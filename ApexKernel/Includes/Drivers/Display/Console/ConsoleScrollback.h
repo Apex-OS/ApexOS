@@ -15,4 +15,16 @@ void fbcon_advance_line(void);
 void fbcon_scroll_up(uint32_t lines);
 void fbcon_scroll_down(uint32_t lines);
 
+// Copies every line VGA.c's real-text-mode scrollback still holds
+// (vga_get_scrollback_line_count()/vga_get_scrollback_cell(), see
+// VGA.h's own comment on why this exists) into this console's own
+// scrollback, so boot output from before the switch to graphics mode
+// (Core/Init.c's vga_enable_graphics_mode() call) stays visible/
+// scrollable-to afterwards instead of just vanishing. Must be called
+// AFTER fbcon_init() (which calls fbcon_clear(), wiping this
+// console's scrollback to blank -- calling this first would just get
+// overwritten) and is meant to run exactly once, right after that
+// switch -- see vga_enable_graphics_mode() itself.
+void fbcon_import_scrollback(void);
+
 #endif // APEX_DRIVERS_DISPLAY_CONSOLE_SCROLLBACK_H

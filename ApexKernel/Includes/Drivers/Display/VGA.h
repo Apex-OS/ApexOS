@@ -96,4 +96,32 @@ void vga_advance_line(void);
 void vga_begin_batch(void);
 void vga_end_batch(void);
 
+// ── Text-mode scrollback export (for the framebuffer console switch) ──────
+// Every boot log line printed before vga_enable_graphics_mode() is
+// called (Core/Init.c: GDT/IDT/PIC/PMM/VMM/heap/ACPI, all still real
+// VGA text mode at that point) lives only in VGA.c's own internal
+// scrollback[][] buffer -- vga_enable_graphics_mode()'s mode switch
+// wipes the physical VGA text-mode screen the instant it succeeds
+// (see that function's own comment), so without exporting this
+// history first, all of it is genuinely gone: not just off-screen,
+// but nowhere to scroll back to either, in either the old text-mode
+// buffer (about to stop being read at all) or the new framebuffer
+// console's own scrollback (which starts out empty).
+//
+// vga_get_scrollback_line_count() returns how many logical lines have
+// ever been written (Core/Init.c calls this once, right after
+// switching, to know how far back to read). vga_get_scrollback_cell()
+// reads a single cell from logical line `line` (0 = oldest line still
+// held -- see this function's own bounds comment -- up to
+// vga_get_scrollback_line_count()-1 = most recent), column `col`
+// (0..vga_get_width()-1). Returns false (leaving *out_c/*out_attr
+// untouched) if `line` is out of range -- either >= the line count
+// above, or older than what's still retained (VGA.c's scrollback[][]
+// is a fixed-size ring buffer -- see that file's SCROLLBACK_LINES --
+// so very early boot output is only available at all if total output
+// before the switch stayed under that many lines, otherwise oldest
+// lines are already gone by the time this could ever be called).
+uint32_t vga_get_scrollback_line_count(void);
+bool vga_get_scrollback_cell(uint32_t line, uint32_t col, char *out_c, uint8_t *out_attr);
+
 #endif // APEX_DRIVERS_DISPLAY_VGA_H

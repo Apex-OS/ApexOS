@@ -4,7 +4,7 @@
 #include "Filesystem/VFS/VolumeRegistry.h"
 #include "Filesystem/VFS/VFSInternal.h"
 #include "Drivers/Display/VGA.h"
-#include "Logs/Log.h"
+#include "Core/Boot/Log/BootLog.h"
 
 vfs_volume_t g_volumes[VFS_MAX_VOLUMES];
 
@@ -61,15 +61,15 @@ bool vfs_register_volume(const char *name, vfs_fs_type_t type, axfs_volume_t *ax
             g_volumes[i].axfs_vol = axfs_vol;
             g_volumes[i].in_use = true;
 
-            klog_ok_prefix();
-            vga_puts("Volume registered: @");
-            vga_puts(g_volumes[i].name);
-            vga_puts("\n");
+            boot_log_start();
+            boot_log_str("Volume registered: @");
+            boot_log_str(g_volumes[i].name);
+            boot_log_end_ok();
             return true;
         }
     }
 
-    klog_error("vfs_register_volume: volume table full");
+    boot_log_error("vfs_register_volume: volume table full");
     return false;
 }
 

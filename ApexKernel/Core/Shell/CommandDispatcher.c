@@ -46,16 +46,15 @@ void shell_execute(void)
     if (cmd_len == 0)
         return;
 
+    klog_shell_begin();
+
     char cmd_name[32];
     char *args;
     tokenize_command(cmd_name, sizeof(cmd_name), &args);
 
     if (str_eq(cmd_name, "help"))
     {
-        if (args[0] != '\0')
-            klog_error("help: too many arguments");
-        else
-            cmd_help();
+        cmd_help(args);
     }
     else if (str_eq(cmd_name, "clear"))
     {
@@ -204,4 +203,6 @@ void shell_execute(void)
         vga_puts(cmd_name);
         vga_puts("\nType 'help' for available commands.\n");
     }
+
+    klog_shell_end();
 }

@@ -13,4 +13,6 @@ void pit_init(void)
     outb(PIT_CMD, 0x36);
     outb(PIT_CHANNEL0, divisor & 0xFF);
     outb(PIT_CHANNEL0, (divisor >> 8) & 0xFF);
+
+    pit_mark_ready();
 }

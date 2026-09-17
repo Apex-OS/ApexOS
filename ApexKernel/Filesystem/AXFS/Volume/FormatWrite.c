@@ -6,14 +6,14 @@
 #include "Filesystem/AXFS/Volume/LayoutCalculation.h"
 #include "Core/Time/PITCounter.h"
 #include "Drivers/Display/VGA.h"
-#include "Logs/Log.h"
+#include "Core/Boot/Log/BootLog.h"
 
 bool axfs_format(axfs_volume_t *vol, const char *volume_label)
 {
     axfs_volume_layout_t layout;
     if (!axfs_calculate_layout(&vol->disk, &layout))
     {
-        klog_error("axfs_format: volume too small or not enough space for metadata");
+        boot_log_error("axfs_format: volume too small or not enough space for metadata");
         return false;
     }
 
@@ -83,7 +83,7 @@ bool axfs_format(axfs_volume_t *vol, const char *volume_label)
     if (root_data_block == 0)
     {
         vol->mounted = false;
-        klog_error("axfs_format: could not allocate root dir block");
+        boot_log_error("axfs_format: could not allocate root dir block");
         return false;
     }
 
@@ -131,12 +131,13 @@ bool axfs_format(axfs_volume_t *vol, const char *volume_label)
 
     axfs_disk_write_block(&vol->disk, 0, &vol->sb);
 
-    klog_ok_prefix();
-    vga_puts("AXFS formatted: ");
-    vga_putdec(layout.total_inodes);
-    vga_puts(" inodes, ");
-    vga_putdec(sb.free_blocks);
-    vga_puts(" free data blocks\n");
+    boot_log_start();
+    boot_log_str("AXFS formatted: ");
+    boot_log_dec(layout.total_inodes);
+    boot_log_str(" inodes, ");
+    boot_log_dec(sb.free_blocks);
+    boot_log_str(" free data blocks");
+    boot_log_end_ok();
 
     return true;
 }

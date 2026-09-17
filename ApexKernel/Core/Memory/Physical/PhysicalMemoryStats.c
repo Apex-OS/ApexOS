@@ -3,20 +3,30 @@
 
 #include "Core/Memory/Physical/PhysicalMemoryStats.h"
 #include "Core/Memory/Physical/PageBitmap.h"
-#include "Drivers/Display/VGA.h"
-#include "Logs/Log.h"
+#include "Core/Boot/Log/BootLog.h"
 
 void pmm_print_stats(void)
 {
     pmm_stats_t s;
     pmm_stats(&s);
 
-    klog_ok_prefix();
-    vga_puts("PMM initialized - Total: ");
-    vga_putdec(s.total_pages * PAGE_SIZE / (1024 * 1024));
-    vga_puts("MB  Free: ");
-    vga_putdec(s.free_pages * PAGE_SIZE / (1024 * 1024));
-    vga_puts("MB  Used: ");
-    vga_putdec(s.used_pages * PAGE_SIZE / (1024 * 1024));
-    vga_puts("MB\n");
+    boot_log_start();
+    boot_log_str("PMM: total ");
+    boot_log_dec(s.total_pages * PAGE_SIZE / (1024 * 1024));
+    boot_log_str("MB (");
+    boot_log_dec(s.total_pages);
+    boot_log_str(" pages)");
+    boot_log_end_ok();
+
+    boot_log_start();
+    boot_log_str("PMM: ");
+    boot_log_dec(s.free_pages);
+    boot_log_str(" pages free (");
+    boot_log_dec(s.free_pages * PAGE_SIZE / (1024 * 1024));
+    boot_log_str("MB), ");
+    boot_log_dec(s.used_pages);
+    boot_log_str(" pages used (");
+    boot_log_dec(s.used_pages * PAGE_SIZE / (1024 * 1024));
+    boot_log_str("MB)");
+    boot_log_end_ok();
 }

@@ -12,6 +12,10 @@ global isr16, isr17, isr18, isr19, isr20, isr21, isr22, isr23
 global isr24, isr25, isr26, isr27, isr28, isr29, isr30, isr31
 global irq1,  irq2,  irq3,  irq4,  irq5,  irq6,  irq7
 global irq8,  irq9,  irq10, irq11, irq12, irq13, irq14, irq15
+global isr240 ; IPI_VECTOR (0xF0), see Core/SMP/IPI/Ipi.h
+global isr48, isr49, isr50, isr51, isr52, isr53, isr54, isr55
+global isr56, isr57, isr58, isr59, isr60, isr61, isr62, isr63 ; IOAPIC_VECTOR_BASE (0x30) + IRQ 0-15, see Core/SMP/IOAPIC/IoApic.h
+global isr241 ; TLB_SHOOTDOWN_VECTOR (0xF1), see Core/SMP/TLB/TlbShootdown.h
 
 extern interrupt_handler
 
@@ -92,6 +96,50 @@ IRQ 12, 44
 IRQ 13, 45
 IRQ 14, 46
 IRQ 15, 47
+
+; ── Generic IPI (Core/SMP/IPI/Ipi.h) ────────────────────────────────────
+; Reuses isr_common (below), NOT irq_common -- irq_common's own tail
+; calls pic_send_eoi() (Core/Interrupts/PIC/PICControl.c), the wrong
+; acknowledgment mechanism entirely for an interrupt that arrived via
+; a LAPIC IPI rather than the legacy PIC. isr_common has no EOI logic
+; of its own either way (every CPU exception it also handles is a
+; fault/trap, never something an EOI applies to) -- Core/SMP/IPI/
+; IpiDispatch.c's ipi_dispatch() sends the LAPIC EOI itself
+; (Core/SMP/APIC/Lapic.h's lapic_send_eoi()) from C once it's done,
+; the correct acknowledgment for this specific vector.
+ISR_NOERR 240
+
+; ── I/O APIC IRQ vectors (IOAPIC_VECTOR_BASE=0x30 through 0x3F) ──────────
+; Reuses isr_common (below), NOT irq_common -- same reasoning as
+; ISR_NOERR 240's own comment just above: irq_common's tail calls
+; pic_send_eoi() (Core/Interrupts/PIC/PICControl.c), the wrong
+; acknowledgment mechanism for an interrupt that arrived via the I/O
+; APIC/LAPIC path rather than the legacy PIC. Core/Interrupts/IRQ/
+; IRQDispatch.c's irq_dispatch() sends the LAPIC EOI itself
+; (Core/SMP/APIC/Lapic.h's lapic_send_eoi()) once it detects the
+; vector is in this range -- see that file's own comment.
+ISR_NOERR 48
+ISR_NOERR 49
+ISR_NOERR 50
+ISR_NOERR 51
+ISR_NOERR 52
+ISR_NOERR 53
+ISR_NOERR 54
+ISR_NOERR 55
+ISR_NOERR 56
+ISR_NOERR 57
+ISR_NOERR 58
+ISR_NOERR 59
+ISR_NOERR 60
+ISR_NOERR 61
+ISR_NOERR 62
+ISR_NOERR 63
+
+; ── TLB shootdown (Core/SMP/TLB/TlbShootdown.h) ──────────────────────────
+; Same isr_common reuse, same EOI-via-LAPIC reasoning as ISR_NOERR 240
+; just above -- this is another CPU's own coordination IPI, never
+; delivered via the PIC.
+ISR_NOERR 241
 
 ; ── Handler commun ISR ────────────────────────────────────────────────────
 isr_common:

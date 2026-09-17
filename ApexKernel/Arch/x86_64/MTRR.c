@@ -2,7 +2,7 @@
 // ApexOS -- Memory Type Range Registers (variable-range MTRR setup)
 
 #include "Arch/x86_64/MTRR.h"
-#include "Logs/Log.h"
+#include "Core/Boot/Log/BootLog.h"
 
 #define MSR_IA32_MTRRCAP 0xFE
 #define MSR_IA32_MTRR_DEF_TYPE 0x2FF
@@ -105,7 +105,7 @@ bool mtrr_set_range(uint64_t phys_base, uint64_t size, uint8_t type)
 {
     if (!mtrr_supported())
     {
-        klog_warn("mtrr_set_range: CPU does not report MTRR support (CPUID.01H:EDX.MTRR) -- skipping");
+        boot_log_warn("mtrr_set_range: CPU does not report MTRR support (CPUID.01H:EDX.MTRR) -- skipping");
         return false;
     }
 
@@ -114,7 +114,7 @@ bool mtrr_set_range(uint64_t phys_base, uint64_t size, uint8_t type)
 
     if (type == MTRR_TYPE_WC && !(mtrrcap & MTRRCAP_WC_SUPPORTED))
     {
-        klog_warn("mtrr_set_range: CPU does not support the WC memory type (IA32_MTRRCAP bit 10 clear) -- skipping");
+        boot_log_warn("mtrr_set_range: CPU does not support the WC memory type (IA32_MTRRCAP bit 10 clear) -- skipping");
         return false;
     }
 
@@ -146,7 +146,7 @@ bool mtrr_set_range(uint64_t phys_base, uint64_t size, uint8_t type)
         }
         if (phys_base % aligned_size != 0)
         {
-            klog_warn("mtrr_set_range: could not find an aligned power-of-two range covering the requested region -- skipping");
+            boot_log_warn("mtrr_set_range: could not find an aligned power-of-two range covering the requested region -- skipping");
             return false;
         }
     }
@@ -166,7 +166,7 @@ bool mtrr_set_range(uint64_t phys_base, uint64_t size, uint8_t type)
     }
     if (free_reg < 0)
     {
-        klog_warn("mtrr_set_range: no free variable-range MTRR register pair -- skipping");
+        boot_log_warn("mtrr_set_range: no free variable-range MTRR register pair -- skipping");
         return false;
     }
 
@@ -226,7 +226,7 @@ bool mtrr_set_range(uint64_t phys_base, uint64_t size, uint8_t type)
 
     __asm__ volatile("sti");
 
-    klog_ok_n("mtrr_set_range: WC range configured, register", (uint64_t)free_reg);
+    boot_log_ok_n("mtrr_set_range: WC range configured, register", (uint64_t)free_reg);
 
     return true;
 }

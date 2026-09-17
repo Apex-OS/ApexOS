@@ -176,6 +176,31 @@ typedef struct
     void *CreateEventEx;
 } EFI_BOOT_SERVICES;
 
+// ── EFI_CONFIGURATION_TABLE ──────────────────────────────────────────
+// system_table->configuration_table (below) points to an array of
+// number_of_table_entries of these -- firmware's way of publishing
+// "here's where table X lives in memory" for tables that aren't a
+// callable protocol (ACPI's RSDP chief among them: this bootloader
+// needs it to hand the kernel a route to MADT for SMP CPU discovery,
+// see Boot/UEFI/AcpiFind.c). Matching a known table by GUID means
+// walking this array and comparing vendor_guid against the constants
+// below.
+typedef struct
+{
+    EFI_GUID vendor_guid;
+    void *vendor_table;
+} EFI_CONFIGURATION_TABLE;
+
+// ACPI_TABLE_GUID (ACPI 1.0 RSDP) -- {eb9d2d30-2d88-11d3-9a16-0090273fc14a}
+#define EFI_ACPI_1_0_TABLE_GUID \
+    {0xeb9d2d30, 0x2d88, 0x11d3, {0x9a, 0x16, 0x00, 0x90, 0x27, 0x3f, 0xc1, 0x4a}}
+
+// ACPI_20_TABLE_GUID (ACPI 2.0+ RSDP, has the XSDT pointer) --
+// {8868e871-e4f1-11d3-bc22-0080c73c8881}. Preferred over the 1.0 GUID
+// when both are present -- see AcpiFind.c for the search order.
+#define EFI_ACPI_2_0_TABLE_GUID \
+    {0x8868e871, 0xe4f1, 0x11d3, {0xbc, 0x22, 0x00, 0x80, 0xc7, 0x3c, 0x88, 0x81}}
+
 // ── EFI_SYSTEM_TABLE (subset) ───────────────────────────────────────
 typedef struct
 {
@@ -191,7 +216,7 @@ typedef struct
     void *runtime_services;
     EFI_BOOT_SERVICES *boot_services;
     size_t number_of_table_entries;
-    void *configuration_table;
+    EFI_CONFIGURATION_TABLE *configuration_table;
 } EFI_SYSTEM_TABLE;
 
 // ── Graphics Output Protocol (GOP) ──────────────────────────────────

@@ -5,7 +5,7 @@
 #include "Bus/PCI/PCI.h"
 #include "Core/Memory/Physical/PageBitmap.h"
 #include "Core/Memory/Virtual/PageTables.h"
-#include "Logs/Log.h"
+#include "Core/Boot/Log/BootLog.h"
 
 // PCI config space offset of the COMMAND register -- bit 2 (Bus
 // Master Enable) must be set for this (or any) PCI device to perform
@@ -164,7 +164,7 @@ bool e1000_init(void)
     pci_device_t dev;
     if (!pci_find_device_by_id(E1000_VENDOR_ID, E1000_DEVICE_ID_82540EM, &dev))
     {
-        klog_warn("e1000_init: no e1000 NIC found on the PCI bus");
+        boot_log_warn("e1000_init: no e1000 NIC found on the PCI bus");
         return false;
     }
 
@@ -235,11 +235,11 @@ bool e1000_init(void)
 
     if (!setup_rx_ring() || !setup_tx_ring())
     {
-        klog_error("e1000_init: RX/TX ring setup failed (out of memory?)");
+        boot_log_error("e1000_init: RX/TX ring setup failed (out of memory?)");
         return false;
     }
 
-    klog_ok_n("e1000_init: NIC ready, MAC address ends in", g_mac[5]);
+    boot_log_ok_n("e1000_init: NIC ready, MAC address ends in", g_mac[5]);
     return true;
 }
 

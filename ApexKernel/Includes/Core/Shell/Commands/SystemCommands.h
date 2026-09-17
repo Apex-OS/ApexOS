@@ -4,7 +4,7 @@
 #ifndef APEX_CORE_SHELL_COMMANDS_SYSTEM_H
 #define APEX_CORE_SHELL_COMMANDS_SYSTEM_H
 
-void cmd_help(void);
+void cmd_help(const char *args);
 void cmd_clear(void);
 void cmd_about(void);
 void cmd_mem(void);

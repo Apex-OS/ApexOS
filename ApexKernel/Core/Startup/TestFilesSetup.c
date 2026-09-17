@@ -9,7 +9,7 @@
 #include "Formats/AXF/Embed/TestImportAXP.h"
 #include "Formats/AXF/Embed/StubAXD.h"
 #include "Formats/AXF/Embed/TestDriverAXP.h"
-#include "Logs/Log.h"
+#include "Core/Boot/Log/BootLog.h"
 
 void core_seed_test_files(axfs_volume_t *vol)
 {
@@ -49,12 +49,12 @@ void core_seed_test_files(axfs_volume_t *vol)
     int driver_id = axd_load(vol, axd_inode);
     if (driver_id < 0)
     {
-        klog_error("kernel: stub.axd failed to load");
+        boot_log_error("kernel: stub.axd failed to load");
         return;
     }
 
     uint64_t ping_result = axd_call(driver_id, 1, 0); // func_id 1 = driver_ping
-    klog_ok_n("kernel: stub.axd driver_ping() returned", ping_result);
+    boot_log_ok_n("kernel: stub.axd driver_ping() returned", ping_result);
 
     // Tests the FULL Ring3 -> SYS_DRIVER_CALL -> Ring0 -> axd_call()
     // path (see ApexToolchain/'s make_test_driver_axp.py). Only

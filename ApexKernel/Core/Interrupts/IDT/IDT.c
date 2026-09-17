@@ -57,6 +57,9 @@ extern void irq12(void);
 extern void irq13(void);
 extern void irq14(void);
 extern void irq15(void);
+extern void isr240(void); // IPI_VECTOR (0xF0), see Core/SMP/IPI/Ipi.h
+extern void isr49(void);  // IOAPIC_VECTOR_BASE (0x30) + IRQ1 (keyboard), see Core/SMP/IOAPIC/IoApic.h -- first IRQ migrated from PIC to I/O APIC routing, others follow once this is validated
+extern void isr241(void); // TLB_SHOOTDOWN_VECTOR (0xF1), see Core/SMP/TLB/TlbShootdown.h
 
 static idt_entry_t idt[256];
 static idt_descriptor_t idt_desc;
@@ -126,7 +129,27 @@ void idt_init(void)
     idt_set_entry(46, (uint64_t)irq14, IDT_FLAG_PRESENT | IDT_FLAG_RING0 | IDT_FLAG_INTERRUPT);
     idt_set_entry(47, (uint64_t)irq15, IDT_FLAG_PRESENT | IDT_FLAG_RING0 | IDT_FLAG_INTERRUPT);
 
+    // Generic IPI, see Core/SMP/IPI/Ipi.h.
+    idt_set_entry(240, (uint64_t)isr240, IDT_FLAG_PRESENT | IDT_FLAG_RING0 | IDT_FLAG_INTERRUPT);
+
+    // First IRQ migrated to I/O APIC routing -- see IoApic.h's own
+    // header comment on why this starts with just IRQ1 (keyboard)
+    // rather than converting every IRQ at once.
+    idt_set_entry(49, (uint64_t)isr49, IDT_FLAG_PRESENT | IDT_FLAG_RING0 | IDT_FLAG_INTERRUPT);
+
+    // Cross-CPU TLB invalidation -- see Core/SMP/TLB/TlbShootdown.h.
+    idt_set_entry(241, (uint64_t)isr241, IDT_FLAG_PRESENT | IDT_FLAG_RING0 | IDT_FLAG_INTERRUPT);
+
     idt_desc.limit = sizeof(idt) - 1;
     idt_desc.base = (uint64_t)&idt;
+    idt_flush((uint64_t)&idt_desc);
+}
+
+void idt_load_on_this_cpu(void)
+{
+    // idt_desc was already filled in by idt_init() (the BSP's own
+    // call, Init.c) -- this just re-issues the lidt against that same
+    // descriptor/table from whichever CPU calls it. See IDT.h's own
+    // comment on why sharing one physical table this way is safe.
     idt_flush((uint64_t)&idt_desc);
 }

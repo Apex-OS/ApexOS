@@ -2,11 +2,10 @@
 // ApexOS -- VMM diagnostics
 
 #include "Core/Memory/Virtual/VirtualMemoryStats.h"
-#include "Drivers/Display/VGA.h"
-#include "Logs/Log.h"
+#include "Core/Boot/Log/BootLog.h"
 
 void vmm_print_stats(void)
 {
-    klog_ok_prefix();
-    vga_puts("VMM initialized - Identity map 0x400000 to end of RAM\n");
+    boot_log_ok("VMM: identity map built (scratch table at 0x7000, copied to 0x1000, CR3 reloaded)");
+    boot_log_ok("VMM: identity-mapped 0x0 to end of detected RAM, plus a 16MB margin past it");
 }

@@ -15,7 +15,7 @@ cd "$WORKDIR"
 echo "== Compiling UEFI bootloader modules =="
 UEFI_CFLAGS="-Wall -Wextra -ffreestanding -fshort-wchar -mno-red-zone -fno-stack-check -fno-stack-protector -mno-stack-arg-probe -I$OLDPWD/ApexKernel/Includes"
 
-for f in Main GraphicsSetup KernelLoad GptReader MemoryMapConvert; do
+for f in Main GraphicsSetup KernelLoad GptReader MemoryMapConvert AcpiFind; do
   echo "  CC  $f.c"
   x86_64-w64-mingw32-gcc $UEFI_CFLAGS \
     -c "$OLDPWD/ApexKernel/Boot/UEFI/$f.c" \
@@ -28,7 +28,7 @@ x86_64-w64-mingw32-gcc \
   -Wl,-entry,efi_main \
   -Wl,-subsystem,10 \
   -Wl,--dll \
-  Main.o GraphicsSetup.o KernelLoad.o GptReader.o MemoryMapConvert.o \
+  Main.o GraphicsSetup.o KernelLoad.o GptReader.o MemoryMapConvert.o AcpiFind.o \
   -o BOOTX64.EFI
 
 file BOOTX64.EFI
@@ -62,6 +62,7 @@ cp /usr/share/OVMF/OVMF_VARS_4M.fd .
 
 qemu-system-x86_64 \
   -M q35 \
+  -smp 4 \
   -drive if=pflash,format=raw,readonly=on,file=OVMF_CODE_4M.fd \
   -drive if=pflash,format=raw,file=OVMF_VARS_4M.fd \
   -drive file=test_uefi.img,format=raw,index=0,media=disk \

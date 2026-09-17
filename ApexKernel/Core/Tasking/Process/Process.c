@@ -3,6 +3,7 @@
 
 #include "Core/Tasking/Process/Process.h"
 #include "Core/Memory/Heap/Heap.h"
+#include "Core/Synchronization/Atomic/Atomic.h"
 
 static uint32_t next_pid = 1;
 
@@ -27,7 +28,15 @@ process_t *process_create(const char *name, void (*entry)(void))
     for (size_t i = 0; i < sizeof(process_t); i++)
         p[i] = 0;
 
-    proc->pid = next_pid++;
+    // atomic_add32() returns the value BEFORE the add (see Atomic.h),
+    // matching plain C's own post-increment semantics
+    // (next_pid++ returns the pre-increment value) -- this is a
+    // drop-in SMP-safe replacement, not a behavior change. Without
+    // this, two CPUs calling process_create() at the same instant
+    // could both read the same next_pid value before either writes
+    // back the incremented result, silently handing out the same PID
+    // to two different processes.
+    proc->pid = atomic_add32(&next_pid, 1);
     copy_name(proc->name, name, 32);
     proc->state = PROCESS_READY;
     proc->ticks = 0;

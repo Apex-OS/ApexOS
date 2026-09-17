@@ -50,6 +50,30 @@ extern bool building_scratch_pml4;
 #define PAGE_ADDR(e) ((e) & 0x000FFFFFFFFFF000ULL)
 
 void vmm_map(uint64_t virt, uint64_t phys, uint64_t flags);
+
+// Identical to vmm_map() above, but additionally broadcasts a TLB
+// shootdown (Core/SMP/TLB/TlbShootdown.h) to every other online CPU
+// afterward -- required whenever a mapping is created/changed AFTER
+// APs may already be running real code that could hold a stale TLB
+// entry for the same virtual address (or for a page table slot whose
+// shape just changed, e.g. a fresh PD/PT page vmm_get_or_create()
+// allocated for this new mapping). vmm_map() itself only ever
+// invalidates the CALLING CPU's own TLB (a single `invlpg`) -- see
+// this function's own discovery story in TlbShootdown.h's header
+// comment for why that silently corrupted an unrelated AP's execution
+// the first time this kernel ever called vmm_map() again after APs
+// were already active (Core/SMP/IOAPIC/IoApic.h's ioapic_init()).
+//
+// Deliberately a SEPARATE function rather than folding the shootdown
+// into vmm_map() itself: the overwhelming majority of this kernel's
+// vmm_map() calls happen early in boot, before any AP exists (the
+// entire identity map, Core/SMP/APIC/Lapic.h's lapic_init(), and
+// dozens of other one-time driver MMIO mappings) -- broadcasting a
+// shootdown IPI and spinning for acks on every one of those would add
+// real overhead for zero benefit (there's no other CPU yet whose TLB
+// could possibly be stale). Callers that run after APs are active use
+// this instead; everything else keeps calling plain vmm_map().
+void vmm_map_and_shootdown(uint64_t virt, uint64_t phys, uint64_t flags);
 void vmm_unmap(uint64_t virt);
 uint64_t vmm_get_phys(uint64_t virt);
 

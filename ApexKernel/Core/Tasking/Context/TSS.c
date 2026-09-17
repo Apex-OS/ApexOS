@@ -3,7 +3,7 @@
 
 #include "Core/Tasking/Context/TSS.h"
 #include "Arch/x86_64/GDTExtension.h"
-#include "Logs/Log.h"
+#include "Core/Boot/Log/BootLog.h"
 
 static tss_t tss;
 
@@ -32,7 +32,7 @@ void tss_init(void)
 
     tss_load(0x28);
 
-    klog_ok_hex("TSS initialized - kernel stack at", tss.rsp0);
+    boot_log_ok_hex("TSS initialized - kernel stack at", tss.rsp0);
 }
 
 void tss_set_kernel_stack(uint64_t rsp0)

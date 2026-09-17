@@ -4,7 +4,7 @@
 #include "Filesystem/AXFS/AXFS.h"
 #include "Filesystem/AXFS/Tree/DefaultTreeData.h"
 #include "Drivers/Display/VGA.h"
-#include "Logs/Log.h"
+#include "Core/Boot/Log/BootLog.h"
 
 bool axfs_create_default_tree(axfs_volume_t *vol)
 {
@@ -17,19 +17,21 @@ bool axfs_create_default_tree(axfs_volume_t *vol)
         uint64_t inode = axfs_create_path(vol, AXFS_ROOT_INODE, AXFS_DEFAULT_TREE[i], AXFS_TYPE_DIR);
         if (inode == 0)
         {
-            klog_error_prefix();
-            vga_puts("axfs_create_default_tree: failed at '");
-            vga_puts(AXFS_DEFAULT_TREE[i]);
-            vga_puts("'\n");
+            boot_log_start();
+            boot_log_str("axfs_create_default_tree: failed at '");
+            boot_log_str(AXFS_DEFAULT_TREE[i]);
+            boot_log_str("'");
+            boot_log_end_error();
             return false;
         }
         created++;
     }
 
-    klog_ok_prefix();
-    vga_puts("Default filesystem tree created (");
-    vga_putdec(created);
-    vga_puts(" directories)\n");
+    boot_log_start();
+    boot_log_str("Default filesystem tree created (");
+    boot_log_dec(created);
+    boot_log_str(" directories)");
+    boot_log_end_ok();
 
     return true;
 }

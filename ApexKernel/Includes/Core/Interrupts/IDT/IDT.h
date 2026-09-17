@@ -77,6 +77,21 @@ typedef struct __attribute__((packed))
 } interrupt_frame_t;
 
 void idt_init(void);
+
+// Loads the IDT idt_init() already built (idt_flush() against the
+// same idt_desc the BSP itself used) onto WHICHEVER CPU calls this --
+// meant for an AP (Core/SMP/Startup/AppProcessorStartup.c's
+// ap_c_entry()) to call once, since idt_init() itself only ever runs
+// on the BSP (Init.c) and each AP otherwise starts with no IDT loaded
+// at all (IDTR left at its post-SIPI default, an invalid/empty
+// table). Safe to share one IDT physical table across every CPU the
+// same way KERNEL_PML4 already is (Boot/Transition/LongModeEntry.asm,
+// Arch/x86_64/ApBootTrampoline.asm) -- an IDT is read-only from every
+// CPU's perspective once built, nothing here ever modifies it after
+// idt_init()'s one-time setup, so there's no cross-CPU mutation
+// hazard the way rebuilding page tables per-CPU would have (see
+// ApBootTrampoline.asm's own comment on that exact danger for CR3).
+void idt_load_on_this_cpu(void);
 void idt_set_entry(uint8_t num, uint64_t handler, uint8_t flags);
 
 #endif // APEX_CORE_INTERRUPTS_IDT_H

@@ -5,7 +5,7 @@
 #include "Filesystem/AXFS/AXFS.h"
 #include "Drivers/Storage/AHCI/AHCI.h"
 #include "Drivers/Display/VGA.h"
-#include "Logs/Log.h"
+#include "Core/Boot/Log/BootLog.h"
 
 // 512-byte sectors per AXFS block -- fixed by AXFS_BLOCK_SIZE (4096)
 // vs the disk's fixed 512-byte sector size, not configurable per
@@ -17,7 +17,7 @@ bool axfs_disk_init_ahci(axfs_disk_t *disk, uint64_t start_sector, uint64_t size
     ahci_drive_info_t drive = ahci_drive_info();
     if (!drive.ready)
     {
-        klog_error("axfs_disk_init_ahci: no AHCI drive ready");
+        boot_log_error("axfs_disk_init_ahci: no AHCI drive ready");
         return false;
     }
 
@@ -26,7 +26,7 @@ bool axfs_disk_init_ahci(axfs_disk_t *disk, uint64_t start_sector, uint64_t size
 
     if (start_sector + sectors_needed > drive.sector_count)
     {
-        klog_error("axfs_disk_init_ahci: requested range exceeds drive size");
+        boot_log_error("axfs_disk_init_ahci: requested range exceeds drive size");
         return false;
     }
 
@@ -36,12 +36,13 @@ bool axfs_disk_init_ahci(axfs_disk_t *disk, uint64_t start_sector, uint64_t size
     disk->ahci_start_lba = start_sector;
     disk->ahci_total_blocks = blocks;
 
-    klog_ok_prefix();
-    vga_puts("AXFS AHCI disk initialized (");
-    vga_putdec(blocks);
-    vga_puts(" blocks, starting at sector ");
-    vga_putdec(start_sector);
-    vga_puts(")\n");
+    boot_log_start();
+    boot_log_str("AXFS AHCI disk initialized (");
+    boot_log_dec(blocks);
+    boot_log_str(" blocks, starting at sector ");
+    boot_log_dec(start_sector);
+    boot_log_str(")");
+    boot_log_end_ok();
 
     return true;
 }
