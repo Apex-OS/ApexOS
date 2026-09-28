@@ -23,7 +23,10 @@ uint64_t axfs_create_path(axfs_volume_t *vol, uint64_t start_inode, const char *
 
     while (1)
     {
-        rest = axfs_path_next_segment(cursor, segment, sizeof(segment));
+        bool truncated;
+        rest = axfs_path_next_segment(cursor, segment, sizeof(segment), &truncated);
+        if (truncated)
+            return 0; // a segment longer than AXFS_MAX_NAME_LEN can never be created anyway
         bool is_last_segment = (rest == NULL);
 
         if (segment[0] == '\0')

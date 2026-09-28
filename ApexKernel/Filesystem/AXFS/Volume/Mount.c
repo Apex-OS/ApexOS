@@ -35,6 +35,59 @@ bool axfs_mount(axfs_volume_t *vol)
         return false;
     }
 
+    // Sanity-checks the superblock's own internal layout before
+    // trusting any of it -- a corrupted superblock (disk corruption, a
+    // bug elsewhere that wrote garbage over it, a buggy external
+    // formatting tool) that still happens to pass the magic/version
+    // checks above could otherwise propagate straight into
+    // alloc_data_block() (Allocation/DataBlockAllocation.c):
+    // `total_blocks - data_start_block` is an unsigned subtraction, so
+    // a data_start_block greater than total_blocks wraps to a huge
+    // value and the block-search loop scans far past the real end of
+    // the disk. Checked here, once, at mount time, rather than
+    // trusting every later reader of these fields to defend against a
+    // superblock that was never internally consistent to begin with.
+    // Doesn't re-derive the exact block counts LayoutCalculation.c
+    // would compute for this total_inodes/total_blocks (that formula
+    // is FormatWrite.c-only today, and re-deriving it here would tie
+    // this check to that formula never changing) -- just confirms the
+    // five region start offsets this superblock claims are in the
+    // expected order and inside the volume, which is enough to catch
+    // gross corruption without assuming anything about exact region
+    // sizes.
+    if (!(sb.journal_start_block == 0 || sb.journal_start_block == 1) ||
+        sb.inode_bitmap_block <= (sb.journal_start_block == 0 ? 0u : sb.journal_start_block) ||
+        sb.block_bitmap_block <= sb.inode_bitmap_block ||
+        sb.inode_table_block <= sb.block_bitmap_block ||
+        sb.data_start_block <= sb.inode_table_block ||
+        sb.data_start_block >= sb.total_blocks)
+    {
+        boot_log_error("axfs_mount: superblock layout is inconsistent -- refusing to mount");
+        return false;
+    }
+
+    // sb.volume_label is read straight off disk and passed to
+    // boot_log_str() (a plain C string function) further down --
+    // must be null-terminated somewhere inside its 32 bytes, or that
+    // call reads past the end of the struct looking for one that was
+    // never there. Same hazard AXF's lib_name/func_name fields have
+    // (see Formats/AXF's own validation) applied here to this
+    // filesystem's own on-disk string field.
+    bool label_terminated = false;
+    for (size_t i = 0; i < sizeof(sb.volume_label); i++)
+    {
+        if (sb.volume_label[i] == '\0')
+        {
+            label_terminated = true;
+            break;
+        }
+    }
+    if (!label_terminated)
+    {
+        boot_log_error("axfs_mount: superblock volume_label is not null-terminated -- refusing to mount");
+        return false;
+    }
+
     vol->sb = sb;
     vol->mounted = true;
 

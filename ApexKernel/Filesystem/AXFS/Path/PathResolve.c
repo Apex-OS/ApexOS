@@ -25,7 +25,10 @@ uint64_t axfs_resolve_path(axfs_volume_t *vol, uint64_t start_inode, const char 
 
     do
     {
-        rest = axfs_path_next_segment(rest ? rest : path, segment, sizeof(segment));
+        bool truncated;
+        rest = axfs_path_next_segment(rest ? rest : path, segment, sizeof(segment), &truncated);
+        if (truncated)
+            return 0; // a segment longer than AXFS_MAX_NAME_LEN can never match a real name anyway
 
         if (segment[0] == '\0')
             break; // empty segment (e.g. path with "//") -- skip
