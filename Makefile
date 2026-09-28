@@ -160,6 +160,7 @@ run-emergency: all
 	@echo "  QEMU    Launching ApexOS (Fallback Test)..."
 	@qemu-system-x86_64              \
         -M q35                       \
+		-smp 4                       \
 		-drive file=$(BUILD)/apex.img,format=raw,index=0,media=disk \
 		-m 256M                      \
 		-netdev user,id=net0         \
@@ -174,6 +175,7 @@ run-debug-int: all
 	@echo "  QEMU    Launching with interrupt logging..."
 	@qemu-system-x86_64              \
 		-M q35                       \
+		-smp 4                       \
 		-drive file=$(BUILD)/apex.img,format=raw,index=0,media=disk \
 		-m 256M                      \
 		-netdev user,id=net0         \
@@ -190,6 +192,7 @@ debug: all
 	@echo "  QEMU    Debug mode (GDB on port 1234)..."
 	@qemu-system-x86_64          \
 		-M q35                   \
+		-smp 4                       \
 		-drive file=$(BUILD)/apex.img,format=raw,index=0,media=disk \
 		-m 256M                  \
 		-netdev user,id=net0         \
