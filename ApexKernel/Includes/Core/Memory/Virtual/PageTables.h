@@ -20,6 +20,22 @@
 // Common flag combinations.
 #define VMM_KERNEL_RW (VMM_PRESENT | VMM_WRITABLE)
 #define VMM_USER_RW (VMM_PRESENT | VMM_WRITABLE | VMM_USER)
+// Same as above, but with the page marked non-executable (requires
+// EFER.NXE, set by Core/Syscalls/ABI/SyscallSetup.c's syscall_init()
+// -- without it the CPU ignores VMM_NO_EXEC entirely and every page
+// stays executable regardless). Use these for any page that holds
+// data a Ring 3 process (or a syscall handler acting on its behalf)
+// can write into but should never be able to jump to: user stacks,
+// heap-backed buffers, and any buffer a syscall like SYS_READ writes
+// into (Core/Syscalls/Validation/UserPointer.h's is_valid_user_range()
+// callers). Still not a full W^X policy on its own -- code pages
+// (USER_CODE_ADDR, USER_LIB_ADDR, AXD_BASE_ADDR) are mapped
+// executable-and-writable today so this kernel's own file loaders can
+// write program bytes into them before ever running them -- but it
+// closes the specific "write-anything, execute-anything" path a
+// corrupted or attacker-controlled data pointer used to have.
+#define VMM_KERNEL_RW_NX (VMM_PRESENT | VMM_WRITABLE | VMM_NO_EXEC)
+#define VMM_USER_RW_NX (VMM_PRESENT | VMM_WRITABLE | VMM_USER | VMM_NO_EXEC)
 
 // Physical address of the kernel PML4 (set up by stage2 at boot).
 #define KERNEL_PML4 0x1000

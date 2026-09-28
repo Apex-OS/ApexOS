@@ -40,7 +40,9 @@ void cmd_ring3(void)
          addr += 4096)
     {
         void *phys = pmm_alloc_page();
-        vmm_map(addr, (uint64_t)phys, VMM_USER_RW);
+        // NX: same reasoning as ProcessLaunch.c's own user stack
+        // mapping -- see PageTables.h's VMM_USER_RW_NX comment.
+        vmm_map(addr, (uint64_t)phys, VMM_USER_RW_NX);
     }
 
     uint64_t stack_top = USER_STACK_ADDR + USER_STACK_SIZE;

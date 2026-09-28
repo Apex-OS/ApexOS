@@ -62,7 +62,11 @@ bool axf_load_and_run(axfs_volume_t *vol, uint64_t inode_num, uint64_t dir_inode
             klog_error("axf_load: out of physical memory (stack)");
             return false;
         }
-        vmm_map(addr, (uint64_t)phys, VMM_USER_RW);
+        // NX: a stack is data, never something a legitimate program
+        // jumps into -- see PageTables.h's VMM_USER_RW_NX comment for
+        // why this matters (the exact primitive a corrupted/attacker-
+        // supplied stack pointer would otherwise give).
+        vmm_map(addr, (uint64_t)phys, VMM_USER_RW_NX);
     }
 
     uint64_t stack_top = USER_STACK_ADDR + USER_STACK_SIZE; // already 16-byte aligned (see Shell.c/ring3)

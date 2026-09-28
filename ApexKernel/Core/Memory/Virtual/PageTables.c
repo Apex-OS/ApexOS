@@ -85,7 +85,16 @@ void vmm_map_and_shootdown(uint64_t virt, uint64_t phys, uint64_t flags)
 
 void vmm_unmap(uint64_t virt)
 {
-    uint64_t *pdpt = (uint64_t *)PAGE_ADDR(pml4[PML4_IDX(virt)]);
+    // active_pml4(), not the raw pml4 variable -- see vmm_map()'s
+    // identical call just above for why: during vmm_init()'s initial
+    // identity-map build (building_scratch_pml4 == true), the table
+    // actually being populated is SCRATCH_PML4, not KERNEL_PML4.
+    // Neither function is ever called during that window today, so
+    // this was latent rather than an active bug -- but a future
+    // caller during that window would have unmapped from the wrong
+    // table entirely, silently doing nothing to the table vmm_map()
+    // itself was using at the time.
+    uint64_t *pdpt = (uint64_t *)PAGE_ADDR(active_pml4()[PML4_IDX(virt)]);
     if (!pdpt)
         return;
 
@@ -103,9 +112,12 @@ void vmm_unmap(uint64_t virt)
 
 uint64_t vmm_get_phys(uint64_t virt)
 {
-    if (!(pml4[PML4_IDX(virt)] & VMM_PRESENT))
+    // active_pml4(), not the raw pml4 variable -- see vmm_unmap()'s
+    // identical comment just above.
+    uint64_t *pml4_table = active_pml4();
+    if (!(pml4_table[PML4_IDX(virt)] & VMM_PRESENT))
         return 0;
-    uint64_t *pdpt = (uint64_t *)PAGE_ADDR(pml4[PML4_IDX(virt)]);
+    uint64_t *pdpt = (uint64_t *)PAGE_ADDR(pml4_table[PML4_IDX(virt)]);
 
     if (!(pdpt[PDPT_IDX(virt)] & VMM_PRESENT))
         return 0;

@@ -15,7 +15,11 @@ void heap_init(void)
         void *phys = pmm_alloc_page();
         if (!phys)
             break;
-        vmm_map(addr, (uint64_t)phys, VMM_KERNEL_RW);
+        // NX: the kernel heap only ever holds data (kmalloc/kcalloc
+        // callers across this codebase never execute anything out of
+        // it) -- see PageTables.h's VMM_KERNEL_RW_NX comment for why
+        // marking it non-executable matters.
+        vmm_map(addr, (uint64_t)phys, VMM_KERNEL_RW_NX);
         heap_size += PAGE_SIZE;
     }
 
