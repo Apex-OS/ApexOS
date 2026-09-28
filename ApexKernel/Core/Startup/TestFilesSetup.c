@@ -9,6 +9,7 @@
 #include "Formats/AXF/Embed/TestImportAXP.h"
 #include "Formats/AXF/Embed/StubAXD.h"
 #include "Formats/AXF/Embed/TestDriverAXP.h"
+#include "Formats/AXF/Embed/CalcAXP.h"
 #include "Core/Boot/Log/BootLog.h"
 
 void core_seed_test_files(axfs_volume_t *vol)
@@ -64,4 +65,16 @@ void core_seed_test_files(axfs_volume_t *vol)
     uint64_t drv_axp_inode = axfs_create(vol, home_inode, "test_driver.axp", AXFS_TYPE_FILE);
     if (drv_axp_inode != 0)
         axfs_write(vol, drv_axp_inode, test_driver_axp_data, sizeof(test_driver_axp_data), 0);
+
+    // Interactive calculator (see ApexToolchain/'s make_calc_axp.py) --
+    // the first .axp in this file to exercise SYS_READ (Core/Syscalls/
+    // Handlers/SysRead.c), which had never been implemented before
+    // this program needed it (SYS_READ existed as a syscall number
+    // constant from the very beginning, but its dispatcher case fell
+    // through to an error until now). Prompts for two single digits
+    // and an operator (+, -, *), computes the result, and prints it --
+    // run with `run calc.axp` from the shell.
+    uint64_t calc_axp_inode = axfs_create(vol, home_inode, "calc.axp", AXFS_TYPE_FILE);
+    if (calc_axp_inode != 0)
+        axfs_write(vol, calc_axp_inode, calc_axp_data, sizeof(calc_axp_data), 0);
 }

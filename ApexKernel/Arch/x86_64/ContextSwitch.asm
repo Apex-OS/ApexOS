@@ -59,6 +59,29 @@ global proc_iretq_start
 %define OFF_RSP     0x90
 %define OFF_SS      0x98
 
+; ── AUDIT: shared, non-per-CPU switch stack ──────────────────────────────────
+; switch_stack_bottom/switch_stack_top below is a SINGLE 4KB stack, not one
+; per CPU. Harmless today only because nothing calls context_switch() yet
+; (see this file's own header comment above) -- there is currently no
+; concurrent caller to race with. The moment this IS wired up to a real
+; yield()/sleep() path, two CPUs calling context_switch() at the same time
+; would both push/pop through this same memory, corrupting each other's
+; saved state mid-switch.
+;
+; Not fixed here because doing so properly needs a stack PER CPU, and this
+; kernel's CPU count is only known at runtime (Core/Acpi/Madt.c's
+; g_madt_info.cpu_count, discovered via ACPI -- see Core/SMP/PerCPU/PerCpu.c,
+; which itself kcalloc()s its own per-CPU array to that count rather than
+; using a fixed MAX_CPUS). The real fix is to give this the same treatment:
+; kcalloc(g_madt_info.cpu_count, 4096) for the switch stacks once at boot,
+; and have context_switch() index into it via percpu_get()->cpu_index rather
+; than referencing a single static buffer -- straightforward, but real work
+; that has no way to be tested against a genuine race until something
+; actually calls this function from more than one CPU. Left as a clearly
+; marked prerequisite for whoever wires up the first real
+; yield()/sleep()/blocking-I-O caller, rather than guessed at blind now.
+; ──────────────────────────────────────────────────────────────────────────
+
 section .bss
 align 16
 switch_stack_bottom:
