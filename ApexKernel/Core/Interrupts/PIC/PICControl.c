@@ -27,3 +27,11 @@ void pic_unmask_irq(uint8_t irq)
         irq -= 8;
     outb(port, inb(port) & ~(1 << irq));
 }
+
+bool pic_irq_is_masked(uint8_t irq)
+{
+    uint16_t port = (irq < 8) ? PIC1_DATA : PIC2_DATA;
+    if (irq >= 8)
+        irq -= 8;
+    return (inb(port) & (1 << irq)) != 0;
+}

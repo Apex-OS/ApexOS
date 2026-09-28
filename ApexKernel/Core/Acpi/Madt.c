@@ -52,12 +52,30 @@ static void walk_entries(madt_t *madt, madt_info_t *out)
 
     while (pos < end)
     {
+        // Must be able to read entry_hdr->type/length themselves (2
+        // bytes) before touching them at all -- pos < end alone only
+        // guarantees at least 1 readable byte remains, not the full
+        // header.
+        if (pos + sizeof(madt_entry_header_t) > end)
+            break;
+
         madt_entry_header_t *entry_hdr = (madt_entry_header_t *)pos;
 
         // A zero-length entry would spin this loop forever -- not
         // expected from a spec-conformant table, but a corrupt/
         // malicious MADT shouldn't be able to hang boot over it.
         if (entry_hdr->length == 0)
+            break;
+
+        // A malformed MADT could claim a length that runs this entry
+        // past the end of the table entirely -- checked before
+        // touching any of this entry's own type-specific fields below
+        // (madt_local_apic_t/madt_io_apic_t/etc. are all wider than
+        // the plain header just read), not just before advancing
+        // `pos` at the bottom of the loop, since those type-specific
+        // reads are exactly what a length that runs past `end` would
+        // otherwise let read past the real ACPI table in memory.
+        if (pos + entry_hdr->length > end)
             break;
 
         if (entry_hdr->type == MADT_ENTRY_LOCAL_APIC && out->cpu_count < MADT_MAX_CPUS)

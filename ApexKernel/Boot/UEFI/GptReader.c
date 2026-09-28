@@ -88,6 +88,17 @@ BOOLEAN find_esp_end_lba(EFI_SYSTEM_TABLE *st, uint64_t *out_end_lba)
     // minimum this file's research notes cite), and this bootloader
     // only needs to find one specific entry, not hold the whole array
     // in memory at once.
+    // gpt->size_of_partition_entry comes straight from the on-disk GPT
+    // header -- a corrupted disk/header could have it read as 0,
+    // which would make the division right below a #DE (divide error)
+    // fault instead of a clean failure, crashing the bootloader with
+    // no message rather than just reporting "no ESP found". Checked
+    // before dividing, not after (the old `entries_per_block == 0`
+    // check one line down could never actually run in that case --
+    // the fault happens on the division itself, before its result is
+    // ever compared to anything).
+    if (gpt->size_of_partition_entry == 0)
+        return FALSE;
     uint32_t entries_per_block = block_size / gpt->size_of_partition_entry;
     if (entries_per_block == 0)
         return FALSE; // defensive -- a partition entry shouldn't be able to exceed one block in practice

@@ -135,7 +135,21 @@ EFI_STATUS efi_main(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *system_table)
     map_size += descriptor_size * 2;
 
     EFI_MEMORY_DESCRIPTOR *map_buffer = NULL;
-    system_table->boot_services->AllocatePool(2 /* EfiLoaderData */, map_size, (void **)&map_buffer);
+    EFI_STATUS pool_status = system_table->boot_services->AllocatePool(2 /* EfiLoaderData */, map_size, (void **)&map_buffer);
+    if (pool_status != EFI_SUCCESS || map_buffer == NULL)
+    {
+        // No point continuing to boot with a memory map buffer that
+        // was never actually allocated -- the GetMemoryMap() call
+        // right below would write past whatever map_buffer happens to
+        // still hold (NULL, most likely, making that call itself
+        // fault) instead of into real allocated memory. Hangs rather
+        // than falling through, same reasoning as the
+        // ExitBootServices() failure path further down in this
+        // function -- no ConOut guaranteed usable this early to report
+        // it either way.
+        for (;;)
+            __asm__ volatile("hlt");
+    }
 
     // This GetMemoryMap() call's map_key is what gets passed to
     // ExitBootServices() below -- nothing between here and that call
@@ -165,7 +179,9 @@ EFI_STATUS efi_main(EFI_HANDLE image_handle, EFI_SYSTEM_TABLE *system_table)
         map_size = 0;
         system_table->boot_services->GetMemoryMap(&map_size, NULL, &map_key, &descriptor_size, &descriptor_version);
         map_size += descriptor_size * 2;
-        system_table->boot_services->AllocatePool(2, map_size, (void **)&map_buffer);
+        EFI_STATUS retry_pool_status = system_table->boot_services->AllocatePool(2, map_size, (void **)&map_buffer);
+        if (retry_pool_status != EFI_SUCCESS || map_buffer == NULL)
+            break; // exit_status stays whatever ExitBootServices() last returned -- reported/handled below
         system_table->boot_services->GetMemoryMap(&map_size, map_buffer, &map_key, &descriptor_size, &descriptor_version);
         convert_memory_map(map_buffer, map_size, descriptor_size);
     }
