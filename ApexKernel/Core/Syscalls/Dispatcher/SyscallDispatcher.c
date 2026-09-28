@@ -5,6 +5,7 @@
 #include "Core/Syscalls/ABI/SyscallSetup.h"
 #include "Core/Syscalls/Handlers/SysExit.h"
 #include "Core/Syscalls/Handlers/SysWrite.h"
+#include "Core/Syscalls/Handlers/SysRead.h"
 #include "Core/Syscalls/Handlers/SysGetPID.h"
 #include "Core/Syscalls/Handlers/SysSleep.h"
 #include "Core/Syscalls/Handlers/SysDriverCall.h"
@@ -20,6 +21,9 @@ uint64_t syscall_handler(uint64_t num, uint64_t arg1,
 
     case SYS_WRITE:
         return sys_write(arg1, arg2, arg3);
+
+    case SYS_READ:
+        return sys_read(arg1, arg2, arg3);
 
     case SYS_GETPID:
         return sys_getpid();

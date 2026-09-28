@@ -119,13 +119,27 @@ uint64_t sys_exit(uint64_t arg1)
         g_old_ctx = NULL;
         g_new_ctx = NULL;
 
-        // 4. Reloads the KERNEL data segments.
+        // 4. Reloads the KERNEL data segments -- gs is deliberately
+        // NOT included here, unlike ds/es/fs. IA32_GS_BASE is set
+        // per-CPU via wrmsr() by Core/SMP/PerCPU/PerCpu.c's
+        // percpu_init_this_cpu() (see that file), completely
+        // independent of the gs SELECTOR's own GDT descriptor -- but
+        // explicitly loading the gs selector with `mov %ax, %gs`
+        // reloads its hidden base from that descriptor as a side
+        // effect on real hardware, silently clobbering the per-CPU
+        // GS_BASE this kernel actually relies on (percpu_get(),
+        // called constantly by the SMP code active since Init.c's own
+        // SMP bring-up) back to whatever flat base the GDT's data
+        // descriptor defines (0) -- breaking percpu_get() for this
+        // CPU for the rest of the kernel's life the moment any syscall
+        // returns via sys_exit(). ds/es/fs carry no such hazard: only
+        // gs's base is ever read via `mov gs:offset` addressing
+        // anywhere in this kernel.
         __asm__ volatile(
             "mov $0x10, %%ax\n"
             "mov %%ax, %%ds\n"
             "mov %%ax, %%es\n"
             "mov %%ax, %%fs\n"
-            "mov %%ax, %%gs\n"
             :
             :
             : "ax");
