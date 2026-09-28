@@ -123,10 +123,14 @@ ap_pm32_entry:
     mov eax, KERNEL_PML4
     mov cr3, eax
 
-    ; ── EFER.LME ─────────────────────────────────────────────────────
+    ; ── EFER.LME + EFER.NXE ──────────────────────────────────────────
+    ; NXE must match the BSP's EFER: the kernel heap (incl. this AP's
+    ; own stack) is mapped with bit 63 (NX) set since the security
+    ; audit. With NXE=0 that bit is reserved -> #PF (RSVD) on the
+    ; very first push, with no IDT loaded yet -> triple fault.
     mov ecx, 0xC0000080
     rdmsr
-    or eax, (1 << 8)
+    or eax, (1 << 8) | (1 << 11)
     wrmsr
 
     ; ── PG + PE ──────────────────────────────────────────────────────
