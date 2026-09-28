@@ -5,6 +5,7 @@
 #include "Formats/AXF/AXL/LibraryLoader.h"
 #include "Core/Memory/Physical/PageBitmap.h"
 #include "Core/Memory/Virtual/PageTables.h"
+#include "Formats/AXF/SafeRange/SafeRange.h"
 #include "Logs/Log.h"
 
 bool axp_resolve_imports(axfs_volume_t *vol, uint64_t dir_inode, const axf_header_t *header,
@@ -13,7 +14,13 @@ bool axp_resolve_imports(axfs_volume_t *vol, uint64_t dir_inode, const axf_heade
     if (header->import_count == 0)
         return true; // nothing to resolve -- standalone binary
 
-    if (header->import_table_offset + header->import_count * sizeof(axf_import_t) > read_bytes)
+    // header->import_count is attacker-controlled -- checked for
+    // overflow via axf_array_fits() (see SafeRange.h) before the
+    // import_count > 64 check below, since a large enough count could
+    // otherwise wrap import_count * sizeof(axf_import_t) back to a
+    // small value and pass a raw bounds check while actually reading
+    // past the file.
+    if (!axf_array_fits(header->import_table_offset, header->import_count, sizeof(axf_import_t), read_bytes))
     {
         klog_error("axf_load: import table extends beyond file");
         return false;
@@ -30,6 +37,13 @@ bool axp_resolve_imports(axfs_volume_t *vol, uint64_t dir_inode, const axf_heade
     {
         axf_import_t imp;
         uint64_t imp_offset = header->import_table_offset + i * sizeof(axf_import_t);
+        // Per-entry check before reading, on top of the aggregate
+        // axf_array_fits() check above the loop.
+        if (!axf_range_fits(imp_offset, sizeof(imp), read_bytes))
+        {
+            klog_error("axf_load: import table entry extends beyond file");
+            return false;
+        }
         const uint8_t *ib = filebuf + imp_offset;
         uint8_t *dst = (uint8_t *)&imp;
         for (uint32_t k = 0; k < sizeof(imp); k++)

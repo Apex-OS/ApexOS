@@ -6,6 +6,7 @@
 #include "Formats/AXF/AXFFormat.h"
 #include "Core/Memory/Physical/PageBitmap.h"
 #include "Core/Memory/Virtual/PageTables.h"
+#include "Formats/AXF/SafeRange/SafeRange.h"
 #include "Logs/Log.h"
 
 axd_driver_t loaded_drivers[AXD_MAX_DRIVERS];
@@ -99,7 +100,13 @@ int axd_load(axfs_volume_t *vol, uint64_t inode_num)
     for (uint32_t i = 0; i < 4096; i++)
         dst_page[i] = 0;
 
-    if (header.section_table_offset + header.section_count * sizeof(axf_section_t) > read_bytes)
+    // header.section_count is attacker-controlled -- checked via
+    // axf_array_fits() rather than the raw addition/multiplication,
+    // which could otherwise wrap for a large enough section_count
+    // (max 8 is already enforced by axd_validate_header(), but that
+    // alone doesn't stop the multiplication below from overflowing
+    // for an attacker-crafted section_table_offset).
+    if (!axf_array_fits(header.section_table_offset, header.section_count, sizeof(axf_section_t), read_bytes))
     {
         klog_error("axd_load: section table extends beyond file");
         return -1;
@@ -115,11 +122,31 @@ int axd_load(axfs_volume_t *vol, uint64_t inode_num)
     {
         axf_section_t sec;
         uint64_t sec_offset = header.section_table_offset + s * sizeof(axf_section_t);
+        // Per-entry bounds check, BEFORE reading filebuf[sec_offset+i]
+        // below -- the loop used to read straight from filebuf here,
+        // trusting the one aggregate check above (section_table_offset
+        // + section_count * sizeof(axf_section_t) <= read_bytes) to
+        // cover every individual entry. That aggregate check is
+        // exactly the kind of attacker-controlled-multiplication
+        // overflow this file's other checks guard against elsewhere
+        // (see axf_array_fits() above) -- if it had somehow passed
+        // while still wrapping, nothing stopped an individual
+        // sec_offset from landing past the file. Checking each entry
+        // here too costs nothing and removes any reliance on the
+        // aggregate check being perfectly tight.
+        if (!axf_range_fits(sec_offset, sizeof(sec), read_bytes))
+        {
+            klog_error("axd_load: section table entry extends beyond file");
+            return -1;
+        }
         uint8_t *sb = (uint8_t *)&sec;
         for (uint32_t i = 0; i < sizeof(sec); i++)
             sb[i] = filebuf[sec_offset + i];
 
-        if (sec.vaddr < file_base || sec.vaddr + sec.mem_size > file_base + 4096)
+        // sec.vaddr/sec.mem_size are attacker-controlled -- checked
+        // via axf_range_fits() rather than the raw addition, which
+        // could otherwise wrap for a large enough mem_size.
+        if (sec.vaddr < file_base || !axf_range_fits(sec.vaddr - file_base, sec.mem_size, 4096))
         {
             klog_error("axd_load: section out of supported range (v1: single 4KB page)");
             return -1;
@@ -129,7 +156,7 @@ int axd_load(axfs_volume_t *vol, uint64_t inode_num)
 
         if (sec.file_size > 0)
         {
-            if (sec.file_offset + sec.file_size > read_bytes)
+            if (!axf_range_fits(sec.file_offset, sec.file_size, read_bytes))
             {
                 klog_error("axd_load: section data extends beyond file");
                 return -1;

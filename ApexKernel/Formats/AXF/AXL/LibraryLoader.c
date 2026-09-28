@@ -6,6 +6,7 @@
 #include "Core/Userspace.h"
 #include "Core/Memory/Physical/PageBitmap.h"
 #include "Core/Memory/Virtual/PageTables.h"
+#include "Formats/AXF/SafeRange/SafeRange.h"
 #include "Drivers/Display/VGA.h"
 #include "Logs/Log.h"
 
@@ -88,7 +89,11 @@ uint64_t load_axl_and_resolve(axfs_volume_t *vol, uint64_t dir_inode, const char
     {
         axf_section_t sec;
         uint64_t sec_offset = header.section_table_offset + s * sizeof(axf_section_t);
-        if (sec_offset + sizeof(sec) > read_bytes)
+        // s * sizeof(axf_section_t) itself can't overflow here (s <
+        // header.section_count <= 8, checked above), but sec_offset +
+        // sizeof(sec) still could if section_table_offset is huge --
+        // checked via axf_range_fits() rather than the raw addition.
+        if (!axf_range_fits(sec_offset, sizeof(sec), read_bytes))
         {
             klog_error("axf_load: import: section table extends beyond file");
             return 0;
@@ -107,7 +112,10 @@ uint64_t load_axl_and_resolve(axfs_volume_t *vol, uint64_t dir_inode, const char
         // distinction.
         uint64_t lib_base = header.base_addr ? header.base_addr : AXF_DEFAULT_BASE_ADDR;
 
-        if (sec.vaddr < lib_base || sec.vaddr + sec.mem_size > lib_base + 4096)
+        // sec.vaddr/sec.mem_size are attacker-controlled -- checked
+        // via axf_range_fits() rather than the raw addition, which
+        // could otherwise wrap for a large enough mem_size.
+        if (sec.vaddr < lib_base || !axf_range_fits(sec.vaddr - lib_base, sec.mem_size, 4096))
         {
             klog_error("axf_load: import: library section out of supported range");
             return 0;
@@ -117,7 +125,7 @@ uint64_t load_axl_and_resolve(axfs_volume_t *vol, uint64_t dir_inode, const char
 
         if (sec.file_size > 0)
         {
-            if (sec.file_offset + sec.file_size > read_bytes)
+            if (!axf_range_fits(sec.file_offset, sec.file_size, read_bytes))
             {
                 klog_error("axf_load: import: section data extends beyond file");
                 return 0;
@@ -128,7 +136,10 @@ uint64_t load_axl_and_resolve(axfs_volume_t *vol, uint64_t dir_inode, const char
     }
 
     // Looks up the requested function in the export table.
-    if (header.export_count == 0 || header.export_table_offset + header.export_count * sizeof(axf_export_t) > read_bytes)
+    // header.export_count is attacker-controlled -- checked via
+    // axf_array_fits() rather than the raw addition/multiplication,
+    // which could otherwise wrap for a large enough export_count.
+    if (header.export_count == 0 || !axf_array_fits(header.export_table_offset, header.export_count, sizeof(axf_export_t), read_bytes))
     {
         klog_error("axf_load: import: library has no valid export table");
         return 0;
@@ -138,12 +149,34 @@ uint64_t load_axl_and_resolve(axfs_volume_t *vol, uint64_t dir_inode, const char
     {
         axf_export_t exp;
         uint64_t exp_offset = header.export_table_offset + e * sizeof(axf_export_t);
+        // Per-entry check before reading, on top of the aggregate
+        // axf_array_fits() check above the loop -- see
+        // HeaderValidation.c's identical addition for why relying on
+        // the aggregate check alone isn't enough by itself.
+        if (!axf_range_fits(exp_offset, sizeof(exp), read_bytes))
+        {
+            klog_error("axf_load: import: export table entry extends beyond file");
+            return 0;
+        }
         uint8_t *eb = (uint8_t *)&exp;
         for (uint32_t i = 0; i < sizeof(exp); i++)
             eb[i] = filebuf[exp_offset + i];
 
         if (str_eq(exp.name, func_name))
         {
+            // exp.offset is attacker-controlled (straight from the
+            // .axl file) -- unlike Formats/AXF/AXD's exports, this one
+            // only ever lands the caller in Ring 3 (whatever imported
+            // this library runs there, never Ring 0), but it must
+            // still stay inside the single page actually mapped at
+            // USER_LIB_ADDR, or the returned "function" address would
+            // point at unmapped/unrelated memory the very first time
+            // anything tried to call it.
+            if (exp.offset >= 4096)
+            {
+                klog_error("axf_load: import: export offset out of page bounds");
+                return 0;
+            }
             // Absolute address = where the function actually lands in
             // memory (USER_LIB_ADDR), not the file's "logical" base
             // address (lib_base) -- exp.offset is relative to the
