@@ -1,0 +1,36 @@
+# Normalize line endings for everything git considers text, and force LF
+# on checkout regardless of the platform (this repo is worked on across
+# WSL and native Linux; CRLF has already caused false "modified" diffs).
+* text=auto eol=lf
+
+# Source files: force LF explicitly (belt and suspenders on top of the
+# text=auto rule above).
+*.c   text eol=lf
+*.h   text eol=lf
+*.asm text eol=lf
+*.ld  text eol=lf
+*.py  text eol=lf
+*.sh  text eol=lf
+Makefile text eol=lf
+
+# Documentation
+*.md text eol=lf
+
+# Binary / build output — never diff, never merge, never touch line endings.
+*.img binary
+*.bin binary
+*.efi binary
+*.axp binary
+*.axl binary
+*.axd binary
+*.o   binary
+*.elf binary
+*.png binary
+*.jpg binary
+*.jpeg binary
+
+# Exclude from `git archive` (release tarballs): dev-only material that
+# a source archive doesn't need.
+Meta/Screenshots/ export-ignore
+Tests/            export-ignore
+.github/          export-ignore
