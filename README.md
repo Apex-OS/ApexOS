@@ -260,9 +260,11 @@ After changing the Makefile or an assembly source, do a clean rebuild (`rm -rf B
 ### UEFI
 
 ```bash
-./test-uefi.sh     # full rebuild: builds BOOTX64.EFI and a fresh test image
-./rerun-uefi.sh    # relaunch the last UEFI image without rebuilding
+./Meta/Scripts/Bash/test-uefi.sh     # full rebuild: builds BOOTX64.EFI and a fresh test image
+./Meta/Scripts/Bash/rerun-uefi.sh    # relaunch the last UEFI image without rebuilding
 ```
+
+Both scripts use paths relative to the current directory, not to the script itself: run them from the project root, as shown above.
 
 ### Using the shell
 
@@ -316,12 +318,15 @@ ApexKernel/
   Formats/AXF/        AXP, AXL, AXD loaders
   Network/Protocols/  ARP, Ethernet, IPv4, ICMP, UDP, TCP
   Includes/           Headers, mirroring the source tree layout
-  ApexLib/            Freestanding base library (types, logging)
-  ApexUI/             Compositor, window manager, taskbar, widgets
-  Tests/              In-kernel test suites
-  Meta/Screenshots/   Images used by this README
-  ApexPKG/  ApexToolchain/  Userland/  Documentation/     Planned, currently empty
-  Linker.ld  Makefile
+ApexLib/               Freestanding base library (types, logging)
+ApexUI/                Compositor, window manager, taskbar, widgets
+Tests/                 In-kernel test suites
+Meta/
+  Screenshots/          Images used by this README
+  Scripts/Bash/         Shell helper scripts (mirror_includes*.sh, test-uefi.sh, rerun-uefi.sh)
+  Scripts/Python/       Python helper scripts (make_calc_axp.py)
+ApexPKG/  ApexToolchain/  Userland/  Documentation/    Planned, currently empty
+Linker.ld  Makefile
 ```
 
 Build conventions: C11, freestanding, no libc, no stack protector, no red zone, and no SSE/MMX code generation (the kernel does not save that state on interrupts or context switches). `-Wall -Wextra` are enabled. Builds currently use `-O0 -g`.
@@ -353,12 +358,9 @@ Build conventions: C11, freestanding, no libc, no stack protector, no red zone, 
 
 ## Contributing
 
-The project is currently developed by a single author. Issues and discussions are welcome. For code contributions:
+The project is currently developed by a single author. Issues and discussions are welcome.
 
-1. Open an issue first to discuss the change.
-2. Keep commits focused, with a message explaining the reason for the change and not only the change.
-3. Match the existing style: a header comment on every file giving its path and purpose, and comments that record _why_ non-obvious code exists.
-4. Verify a clean boot with `-smp 4` before submitting.
+See [`CONTRIBUTING.md`](CONTRIBUTING.md) for setup instructions, design conventions and what to check before opening a pull request. For anything with a security implication, see [`SECURITY.md`](SECURITY.md) instead of opening a public issue.
 
 ---
 
