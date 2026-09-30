@@ -1,0 +1,54 @@
+name: Bug report
+description: Something doesn't work as expected (crash, wrong output, build failure)
+labels: ["bug"]
+body:
+    - type: textarea
+      id: description
+      attributes:
+          label: What happened
+          description: What did you expect, and what happened instead?
+      validations:
+          required: true
+
+    - type: textarea
+      id: repro
+      attributes:
+          label: How to reproduce
+          description: Shell commands, the QEMU command line used, and/or a minimal input file (AXP/AXL/AXD/AXFS image) that triggers it.
+          placeholder: |
+              make run
+              ApexOS /@SysDisk/Home/Users/...> run something.axp
+      validations:
+          required: true
+
+    - type: input
+      id: commit
+      attributes:
+          label: Commit or version
+          description: Output of `git rev-parse HEAD`, or the version shown by `about` in the shell.
+      validations:
+          required: true
+
+    - type: dropdown
+      id: boot
+      attributes:
+          label: Boot path
+          options:
+              - BIOS
+              - UEFI
+              - Both
+      validations:
+          required: true
+
+    - type: textarea
+      id: logs
+      attributes:
+          label: Boot log / GDB output / QEMU output
+          description: Paste relevant output. For a triple fault, `-d int,cpu_reset -D qemu.log -no-reboot` output is far more useful than post-crash register dumps (see the README's Debugging section).
+          render: text
+
+    - type: textarea
+      id: environment
+      attributes:
+          label: Host environment
+          description: Host OS, QEMU version (`qemu-system-x86_64 --version`), KVM enabled or not.
