@@ -48,7 +48,12 @@ Design goals:
 - **Correct before fast.** Cross-CPU behaviour, memory permissions and untrusted input (userspace pointers, executable formats, on-disk structures) are treated as hostile by default.
 - **Own formats.** ApexOS defines its own executable format (AXF) and filesystem (AXFS) rather than reimplementing existing ones.
 
-The codebase is roughly 28,000 lines of C and assembly.
+The codebase is roughly 28,000 lines of C and assembly, split into four top-level projects, each with its own README for the detail this file doesn't cover:
+
+- [`ApexKernel/`](ApexKernel/README.md) — boot, memory, interrupts, SMP, scheduling, syscalls, filesystem, executable loading, drivers, networking
+- [`ApexLib/`](ApexLib/README.md) — freestanding base library (types, logging; more planned)
+- [`ApexUI/`](ApexUI/README.md) — the graphical layer: compositor, window manager, taskbar, widgets
+- `ApexPKG/`, `ApexToolchain/` — reserved for a future package manager and AXF toolchain, not started yet
 
 ---
 
@@ -133,6 +138,13 @@ ApexOS is in early development (`v0.1.5`). It boots and runs on QEMU (BIOS and U
 
 ## Architecture
 
+This section covers the system-wide picture: how the two boot paths converge,
+and the project's biggest cross-cutting rule (W^X). Subsystem-level detail —
+the exact memory layout, the SMP bring-up sequence, the syscall ABI, the AXF
+format, AXFS internals, the network stack's protocol stack — lives in
+[`ApexKernel/README.md`](ApexKernel/README.md) instead, next to the code it
+describes.
+
 ### Boot flow
 
 ```
@@ -151,70 +163,14 @@ ApexOS is in early development (`v0.1.5`). It boots and runs on QEMU (BIOS and U
 
 Both boot paths load the same `kernel.bin` and pass information (memory map, framebuffer, ACPI RSDP, disk layout) through structures at fixed low-memory addresses that the bootloaders and the kernel agree on.
 
-### Physical and virtual memory layout
+### W^X
 
-| Region         | Address              | Purpose                            |
-| -------------- | -------------------- | ---------------------------------- |
-| Kernel PML4    | `0x1000`             | Shared by every CPU                |
-| AP trampoline  | `0x8000`             | Copied by the BSP before each SIPI |
-| Kernel image   | `0x100000`           | Loaded here, see `Linker.ld`       |
-| User code      | `0x400000`           | AXP text                           |
-| User libraries | `0x600000`           | AXL mappings                       |
-| User stack     | `0x700000`           | 16 KiB                             |
-| Kernel heap    | `0x4000000` (64 MiB) | 16 MiB, mapped non-executable      |
-| I/O APIC       | `0xFEC00000`         | MMIO, uncached                     |
-| Local APIC     | `0xFEE00000`         | MMIO, uncached                     |
-
-Physical RAM is identity-mapped from `0x0` to the end of detected RAM plus a 16 MiB margin, so firmware tables placed just past RAM stay reachable.
-
-### SMP bring-up
-
-1. The BSP parses ACPI (RSDP, RSDT, MADT) to enumerate CPUs and I/O APICs.
-2. Each AP is woken one at a time: the BSP copies the 16-bit trampoline to `0x8000`, fills a shared data block (stack top, C entry point, CPU index) and sends INIT then SIPI.
-3. The trampoline switches real mode, protected mode, then long mode, reusing the BSP's already-built kernel page tables, and calls `ap_c_entry()`.
-4. The AP loads the IDT, initialises its Local APIC and per-CPU slot (`GS_BASE`), and reports online.
-
-Because the kernel heap and AP stacks are mapped with the NX bit, **the trampoline must enable `EFER.NXE` in addition to `EFER.LME`**: otherwise bit 63 is a reserved bit on the AP, and the first stack access raises a page fault that ends in a triple fault (no IDT is loaded yet at that point).
-
-### System call ABI
-
-Invoked with the `syscall` instruction; the result is returned in `rax`.
-
-| Number | Name              | Description                                         |
-| ------ | ----------------- | --------------------------------------------------- |
-| 0      | `SYS_EXIT`        | Terminate the calling process                       |
-| 1      | `SYS_WRITE`       | Write to the console                                |
-| 2      | `SYS_READ`        | Read input                                          |
-| 3      | `SYS_GETPID`      | Current process ID                                  |
-| 4      | `SYS_SLEEP`       | Reserved; currently a stub that returns immediately |
-| 5      | `SYS_DRIVER_CALL` | Call an exported function of a loaded `.axd` driver |
-
-All user-supplied pointers are checked against an allowlist of user regions before the kernel dereferences them.
-
-### AXF executable format
-
-| Extension | Kind    | Runs in | Notes                                                 |
-| --------- | ------- | ------- | ----------------------------------------------------- |
-| `.axp`    | Program | Ring 3  | Standalone executable                                 |
-| `.axl`    | Library | Ring 3  | Import/export tables, real cross-binary calls         |
-| `.axd`    | Driver  | Ring 0  | Loaded by the kernel, reachable via `SYS_DRIVER_CALL` |
-
-Every header field, offset, size and count is validated with overflow-safe range checks before use.
-
-### AXFS and VFS
-
-AXFS is a native filesystem with a superblock, bitmap allocation of inodes and data blocks, and a journal. It runs on a RAM backend or on a real disk through the AHCI driver. The VFS layer routes paths of the form `/@SysDisk/Home/...` to the right volume and is designed to accept further filesystem types.
-
-### Networking
-
-```
-e1000 -> Ethernet -> ARP
-                  -> IPv4 -> ICMP (ping)
-                          -> UDP  (DNS client)
-                          -> TCP  (client, one connection)
-```
-
-TCP implements the three-way handshake, data transfer and stop-and-wait retransmission. Addressing is static (QEMU user-mode defaults, `10.0.2.15`); there is no DHCP client.
+The kernel heap and user stacks are mapped non-executable (`EFER.NXE`,
+`VMM_KERNEL_RW_NX`/`VMM_USER_RW_NX`). This is the one memory-safety rule
+that reaches across nearly every subsystem — it's why the AP trampoline has
+to enable `EFER.NXE` itself (see `ApexKernel/README.md`), why a future JIT
+or relocatable loader would need an explicit executable mapping, and why
+it's listed first in the hardening table below.
 
 ---
 
@@ -330,6 +286,8 @@ Linker.ld  Makefile
 ```
 
 Build conventions: C11, freestanding, no libc, no stack protector, no red zone, and no SSE/MMX code generation (the kernel does not save that state on interrupts or context switches). `-Wall -Wextra` are enabled. Builds currently use `-O0 -g`.
+
+See [`ApexKernel/README.md`](ApexKernel/README.md), [`ApexLib/README.md`](ApexLib/README.md) and [`ApexUI/README.md`](ApexUI/README.md) for what's actually implemented versus reserved-but-empty within each of these directories.
 
 ---
 
